@@ -1,0 +1,150 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build and Create Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Get version information
+        id: version
+        run: |
+          # Get version from tag (remove 'v' prefix)
+          VERSION=${GITHUB_REF_NAME#v}
+
+          # Get git commit
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+
+          # Get build time
+          BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "git_commit=$GIT_COMMIT" >> $GITHUB_OUTPUT
+          echo "build_time=$BUILD_TIME" >> $GITHUB_OUTPUT
+
+          # Update VERSION file to match tag
+          echo "$VERSION" > VERSION
+
+      - name: Build daemon binary
+        working-directory: daemon
+        run: |
+          mkdir -p ../dispense/pkg/daemon
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build \
+            -ldflags "-s -w \
+              -X main.Version=${{ steps.version.outputs.version }} \
+              -X main.GitCommit=${{ steps.version.outputs.git_commit }} \
+              -X main.BuildTime=${{ steps.version.outputs.build_time }}" \
+            -o ../dispense/pkg/daemon/daemon-linux-amd64 \
+            ./cmd/main.go
+
+      - name: Build Linux AMD64 binary
+        working-directory: dispense
+        run: |
+          mkdir -p ../dist/dispense
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build \
+            -ldflags "-X main.Version=${{ steps.version.outputs.version }} \
+              -X main.GitCommit=${{ steps.version.outputs.git_commit }} \
+              -X main.BuildTime=${{ steps.version.outputs.build_time }}" \
+            -o ../dist/dispense/dispense-linux-amd64 \
+            ./cmd/main.go \
+            ./cmd/list.go \
+            ./cmd/shell.go \
+            ./cmd/ssh.go \
+            ./cmd/new.go \
+            ./cmd/daemon.go \
+            ./cmd/db.go \
+            ./cmd/delete.go \
+            ./cmd/claude.go
+
+      - name: Build macOS ARM64 binary
+        working-directory: dispense
+        run: |
+          GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build \
+            -ldflags "-X main.Version=${{ steps.version.outputs.version }} \
+              -X main.GitCommit=${{ steps.version.outputs.git_commit }} \
+              -X main.BuildTime=${{ steps.version.outputs.build_time }}" \
+            -o ../dist/dispense/dispense-darwin-arm64 \
+            ./cmd/main.go \
+            ./cmd/list.go \
+            ./cmd/shell.go \
+            ./cmd/ssh.go \
+            ./cmd/new.go \
+            ./cmd/daemon.go \
+            ./cmd/db.go \
+            ./cmd/delete.go \
+            ./cmd/claude.go
+
+      - name: Test binaries
+        run: |
+          ./dist/dispense/dispense-linux-amd64 --version
+          file ./dist/dispense/dispense-linux-amd64
+          file ./dist/dispense/dispense-darwin-arm64
+
+      - name: Create checksums
+        working-directory: dist/dispense
+        run: |
+          sha256sum dispense-* > checksums.txt
+          cat checksums.txt
+
+      - name: Create release notes
+        run: |
+          cat > release-notes.md << 'EOF'
+          ## Dispense CLI ${{ steps.version.outputs.version }}
+
+          ### Downloads
+
+          Choose the appropriate binary for your platform:
+
+          - **Linux AMD64**: `dispense-linux-amd64`
+          - **macOS Apple Silicon**: `dispense-darwin-arm64`
+
+          ### Installation
+
+          1. Download the appropriate binary
+          2. Make it executable: `chmod +x dispense-<platform>`
+          3. Move to your PATH: `mv dispense-<platform> /usr/local/bin/dispense`
+
+          ### Usage
+
+          ```bash
+          dispense --help
+          dispense --version
+          ```
+
+          ### Build Information
+
+          - **Version**: ${{ steps.version.outputs.version }}
+          - **Git Commit**: ${{ steps.version.outputs.git_commit }}
+          - **Build Time**: ${{ steps.version.outputs.build_time }}
+
+          ### Checksums
+
+          See `checksums.txt` for SHA256 checksums of all binaries.
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ steps.version.outputs.version }}
+          body_path: release-notes.md
+          files: |
+            dist/dispense/dispense-linux-amd64
+            dist/dispense/dispense-darwin-arm64
+            dist/dispense/checksums.txt
+          draft: false
+          prerelease: false

@@ -1,0 +1,153 @@
+name: Build Dispense Binaries
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Dispense Binaries
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - name: linux-amd64
+            goos: linux
+            goarch: amd64
+            binary_suffix: dispense-linux-amd64
+          - name: darwin-arm64
+            goos: darwin
+            goarch: arm64
+            binary_suffix: dispense-darwin-arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Get version information
+        id: version
+        run: |
+          # Get version from VERSION file
+          VERSION=$(cat VERSION 2>/dev/null || echo "dev")
+
+          # Get git commit
+          GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+
+          # Get build time
+          BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "git_commit=$GIT_COMMIT" >> $GITHUB_OUTPUT
+          echo "build_time=$BUILD_TIME" >> $GITHUB_OUTPUT
+
+      - name: Build daemon binary
+        working-directory: daemon
+        run: |
+          mkdir -p ../dispense/pkg/daemon
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build \
+            -ldflags "-s -w \
+              -X main.Version=${{ steps.version.outputs.version }} \
+              -X main.GitCommit=${{ steps.version.outputs.git_commit }} \
+              -X main.BuildTime=${{ steps.version.outputs.build_time }}" \
+            -o ../dispense/pkg/daemon/daemon-linux-amd64 \
+            ./cmd/main.go
+
+      - name: Build Dispense binary for ${{ matrix.name }}
+        working-directory: dispense
+        run: |
+          mkdir -p ../dist/dispense
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CGO_ENABLED=0 go build \
+            -ldflags "-X main.Version=${{ steps.version.outputs.version }} \
+              -X main.GitCommit=${{ steps.version.outputs.git_commit }} \
+              -X main.BuildTime=${{ steps.version.outputs.build_time }}" \
+            -o ../dist/dispense/${{ matrix.binary_suffix }} \
+            ./cmd/main.go \
+            ./cmd/list.go \
+            ./cmd/shell.go \
+            ./cmd/ssh.go \
+            ./cmd/new.go \
+            ./cmd/daemon.go \
+            ./cmd/db.go \
+            ./cmd/delete.go \
+            ./cmd/claude.go
+
+      - name: Test binary
+        if: matrix.goos == 'linux'
+        run: |
+          ./dist/dispense/${{ matrix.binary_suffix }} --version
+          ./dist/dispense/${{ matrix.binary_suffix }} --help
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dispense-${{ matrix.binary_suffix }}
+          path: dist/dispense/${{ matrix.binary_suffix }}
+          retention-days: 90
+
+  # Create a combined artifact with all binaries
+  package:
+    name: Package All Binaries
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Linux AMD64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: dispense-dispense-linux-amd64
+          path: ./binaries/
+
+      - name: Download macOS ARM64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: dispense-dispense-darwin-arm64
+          path: ./binaries/
+
+      - name: Create release package
+        run: |
+          mkdir -p release
+          cp binaries/* release/
+          cd release
+          ls -la
+
+          # Create checksums
+          sha256sum * > checksums.txt
+
+          # Create README
+          cat > README.txt << 'EOF'
+          Dispense Binaries
+          ====================
+
+          This package contains Dispense binaries for different platforms:
+
+          - dispense-linux-amd64: Linux AMD64 binary
+          - dispense-darwin-arm64: macOS Apple Silicon (ARM64) binary
+
+          Installation:
+          1. Download the appropriate binary for your platform
+          2. Make it executable: chmod +x <binary-name>
+          3. Move to your PATH: mv <binary-name> /usr/local/bin/dispense
+
+          Usage:
+          Run 'dispense --help' to see available commands.
+
+          Version information:
+          Run 'dispense --version' to see version details.
+          EOF
+
+      - name: Upload combined package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dispense-dispense-all-platforms
+          path: release/
+          retention-days: 90

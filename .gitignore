@@ -1,0 +1,88 @@
+
+# Dependencies
+node_modules/
+*/node_modules/
+package-lock.json
+yarn.lock
+
+# Build outputs
+dist/
+build/
+out/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go binaries
+**/dispense/dispense
+**/daemon/daemon
+dispense/pkg/daemon/daemon-linux-amd64
+
+# Go build artifacts
+*.mod.backup
+go.work
+go.work.sum
+vendor/
+
+# Development environment
+.env
+.env.local
+.env.*.local
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Nx cache and workspace data
+.nx/installation
+.nx/cache
+.nx/workspace-data
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Temporary directories and files
+tmp/
+temp/
+.tmp/
+*.tmp
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Cursor AI generated files
+.cursor/rules/nx-rules.mdc
+
+# GitHub generated files
+.github/instructions/nx.instructions.md
+
+# Claude AI artifacts
+.claude/

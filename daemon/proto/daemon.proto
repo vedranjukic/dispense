@@ -1,0 +1,124 @@
+syntax = "proto3";
+
+package daemon;
+
+option go_package = "cli/proto";
+
+// ProjectService provides project-related operations
+service ProjectService {
+  rpc Init(InitRequest) returns (InitResponse);
+  rpc Logs(LogsRequest) returns (stream LogsResponse);
+}
+
+// AgentService provides agent-related operations
+service AgentService {
+  rpc Init(InitRequest) returns (InitResponse);
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse);
+  rpc ExecuteClaude(ExecuteClaudeRequest) returns (stream ExecuteClaudeResponse);
+  rpc GetTaskStatus(TaskStatusRequest) returns (TaskStatusResponse);
+  rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
+}
+
+// Common request/response types
+message InitRequest {
+  string project_type = 1;
+}
+
+message InitResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message LogsRequest {
+  // Add any log filtering parameters here
+}
+
+message LogsResponse {
+  string log_entry = 1;
+  int64 timestamp = 2;
+}
+
+// CreateTaskRequest for creating new tasks
+message CreateTaskRequest {
+  string prompt = 1;
+  string working_directory = 2;
+  map<string, string> environment_vars = 3;
+  string anthropic_api_key = 4;
+}
+
+message CreateTaskResponse {
+  bool success = 1;
+  string task_id = 2;
+  string message = 3;
+}
+
+// ExecuteClaudeRequest for running Claude with a prompt
+message ExecuteClaudeRequest {
+  string prompt = 1;
+  string working_directory = 2;
+  map<string, string> environment_vars = 3;
+  string anthropic_api_key = 4;
+}
+
+// ExecuteClaudeResponse streams Claude execution output
+message ExecuteClaudeResponse {
+  enum ResponseType {
+    STDOUT = 0;
+    STDERR = 1;
+    STATUS = 2;
+    ERROR = 3;
+  }
+
+  ResponseType type = 1;
+  string content = 2;
+  int64 timestamp = 3;
+  int32 exit_code = 4;  // Only set for STATUS type
+  bool is_finished = 5; // Indicates if execution is complete
+}
+
+// TaskStatusRequest for checking task status
+message TaskStatusRequest {
+  string task_id = 1;
+}
+
+// TaskStatusResponse returns current task status
+message TaskStatusResponse {
+  enum TaskState {
+    PENDING = 0;
+    RUNNING = 1;
+    COMPLETED = 2;
+    FAILED = 3;
+  }
+
+  TaskState state = 1;
+  string message = 2;
+  int32 exit_code = 3;
+  int64 started_at = 4;
+  int64 finished_at = 5;
+  string error = 6;
+  string prompt = 7;
+  string working_directory = 8;
+}
+
+// ListTasksRequest for listing all tasks
+message ListTasksRequest {
+  // Optional: filter by state
+  TaskStatusResponse.TaskState state_filter = 1;
+}
+
+// TaskInfo contains information about a task
+message TaskInfo {
+  string task_id = 1;
+  string prompt = 2;
+  TaskStatusResponse.TaskState state = 3;
+  int64 started_at = 4;
+  int64 finished_at = 5;
+  int32 exit_code = 6;
+  string error = 7;
+  string working_directory = 8;
+}
+
+// ListTasksResponse returns list of tasks
+message ListTasksResponse {
+  repeated TaskInfo tasks = 1;
+}

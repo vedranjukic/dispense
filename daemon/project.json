@@ -1,0 +1,123 @@
+{
+  "name": "daemon",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "daemon",
+  "root": "daemon",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "./build.sh",
+        "cwd": "daemon"
+      },
+      "configurations": {},
+      "parallelism": true
+    },
+    "build-linux-amd64": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "./build-linux-amd64.sh",
+        "cwd": "daemon"
+      },
+      "configurations": {},
+      "parallelism": true
+    },
+    "build-darwin-arm64": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "mkdir -p ../dist/daemon && GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o ../dist/daemon/daemon-darwin-arm64 ./cmd/main.go",
+        "cwd": "daemon"
+      },
+      "configurations": {},
+      "parallelism": true
+    },
+    "build-all": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "echo 'Building all platforms...'",
+        "cwd": "daemon"
+      },
+      "dependsOn": [
+        "build-linux-amd64",
+        "build-darwin-arm64"
+      ],
+      "configurations": {},
+      "parallelism": true
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "go run ./cmd/main.go {args}",
+        "cwd": "daemon"
+      },
+      "configurations": {},
+      "parallelism": true
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "go test ./...",
+        "cwd": "daemon"
+      },
+      "configurations": {},
+      "parallelism": true
+    },
+    "mod-init": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "go mod init daemon",
+        "cwd": "daemon"
+      },
+      "configurations": {},
+      "parallelism": true
+    },
+    "tidy": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "go mod tidy",
+        "cwd": "daemon"
+      },
+      "configurations": {},
+      "parallelism": true
+    },
+    "format": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "go fmt ./...",
+        "cwd": "daemon"
+      },
+      "configurations": {},
+      "parallelism": true
+    },
+    "generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "./generate.sh",
+        "cwd": "daemon"
+      },
+      "configurations": {},
+      "parallelism": true
+    },
+    "build-client": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "mkdir -p ../dist/daemon && go build -o ../dist/daemon/client ./examples/client/main.go",
+        "cwd": "daemon"
+      },
+      "configurations": {},
+      "parallelism": true
+    },
+    "run-client": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "go run ./examples/client/main.go",
+        "cwd": "daemon"
+      },
+      "configurations": {},
+      "parallelism": true
+    }
+  },
+  "implicitDependencies": []
+}
