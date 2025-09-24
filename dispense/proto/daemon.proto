@@ -44,6 +44,7 @@ message CreateTaskRequest {
   string working_directory = 2;
   map<string, string> environment_vars = 3;
   string anthropic_api_key = 4;
+  string model = 5;
 }
 
 message CreateTaskResponse {
@@ -58,6 +59,7 @@ message ExecuteClaudeRequest {
   string working_directory = 2;
   map<string, string> environment_vars = 3;
   string anthropic_api_key = 4;
+  string model = 5;
 }
 
 // ExecuteClaudeResponse streams Claude execution output

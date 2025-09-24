@@ -264,7 +264,8 @@ Usage:
 				fmt.Fprintf(os.Stderr, "❌ Failed to get working directory: %s\n", err)
 				os.Exit(1)
 			}
-			if err := runClaudeWithPrompt(prompt, workDir, sandboxName); err != nil {
+			modelFlag := cmd.Root().Flag("model").Value.String()
+			if err := runClaudeWithPrompt(prompt, workDir, sandboxName, modelFlag); err != nil {
 				fmt.Fprintf(os.Stderr, "❌ Claude execution failed: %s\n", err)
 				os.Exit(1)
 			}
@@ -365,7 +366,7 @@ func checkClaudeDaemonStatus(sandboxName string) error {
 }
 
 // runClaudeWithPrompt executes Claude with the given prompt
-func runClaudeWithPrompt(prompt, workDir, sandboxName string) error {
+func runClaudeWithPrompt(prompt, workDir, sandboxName, model string) error {
 	if sandboxName == "" {
 		return fmt.Errorf("sandbox name is required. Use --sandbox flag to specify which sandbox to use")
 	}
@@ -403,6 +404,7 @@ func runClaudeWithPrompt(prompt, workDir, sandboxName string) error {
 		WorkingDirectory: workDir,
 		EnvironmentVars:  make(map[string]string), // Add any needed env vars
 		AnthropicApiKey:  apiKey,
+		Model:           model,
 	}
 
 	fmt.Printf("🟡 Claude is working...\n")
@@ -657,7 +659,7 @@ func runClaudeOnGitHubIssue(sandboxName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get working directory: %w", err)
 	}
-	return runClaudeWithPrompt(taskPrompt.String(), workDir, sandboxName)
+	return runClaudeWithPrompt(taskPrompt.String(), workDir, sandboxName, "")
 }
 
 // readTaskDataFromSandbox reads the GitHub issue task data from the sandbox

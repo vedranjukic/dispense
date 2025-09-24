@@ -317,6 +317,7 @@ type CreateTaskRequest struct {
 	WorkingDirectory string                 `protobuf:"bytes,2,opt,name=working_directory,json=workingDirectory,proto3" json:"working_directory,omitempty"`
 	EnvironmentVars  map[string]string      `protobuf:"bytes,3,rep,name=environment_vars,json=environmentVars,proto3" json:"environment_vars,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	AnthropicApiKey  string                 `protobuf:"bytes,4,opt,name=anthropic_api_key,json=anthropicApiKey,proto3" json:"anthropic_api_key,omitempty"`
+	Model            string                 `protobuf:"bytes,5,opt,name=model,proto3" json:"model,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -375,6 +376,13 @@ func (x *CreateTaskRequest) GetEnvironmentVars() map[string]string {
 func (x *CreateTaskRequest) GetAnthropicApiKey() string {
 	if x != nil {
 		return x.AnthropicApiKey
+	}
+	return ""
+}
+
+func (x *CreateTaskRequest) GetModel() string {
+	if x != nil {
+		return x.Model
 	}
 	return ""
 }
@@ -446,6 +454,7 @@ type ExecuteClaudeRequest struct {
 	WorkingDirectory string                 `protobuf:"bytes,2,opt,name=working_directory,json=workingDirectory,proto3" json:"working_directory,omitempty"`
 	EnvironmentVars  map[string]string      `protobuf:"bytes,3,rep,name=environment_vars,json=environmentVars,proto3" json:"environment_vars,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	AnthropicApiKey  string                 `protobuf:"bytes,4,opt,name=anthropic_api_key,json=anthropicApiKey,proto3" json:"anthropic_api_key,omitempty"`
+	Model            string                 `protobuf:"bytes,5,opt,name=model,proto3" json:"model,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -504,6 +513,13 @@ func (x *ExecuteClaudeRequest) GetEnvironmentVars() map[string]string {
 func (x *ExecuteClaudeRequest) GetAnthropicApiKey() string {
 	if x != nil {
 		return x.AnthropicApiKey
+	}
+	return ""
+}
+
+func (x *ExecuteClaudeRequest) GetModel() string {
+	if x != nil {
+		return x.Model
 	}
 	return ""
 }
@@ -936,24 +952,26 @@ const file_proto_daemon_proto_rawDesc = "" +
 	"\vLogsRequest\"I\n" +
 	"\fLogsResponse\x12\x1b\n" +
 	"\tlog_entry\x18\x01 \x01(\tR\blogEntry\x12\x1c\n" +
-	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\"\xa3\x02\n" +
+	"\ttimestamp\x18\x02 \x01(\x03R\ttimestamp\"\xb9\x02\n" +
 	"\x11CreateTaskRequest\x12\x16\n" +
 	"\x06prompt\x18\x01 \x01(\tR\x06prompt\x12+\n" +
 	"\x11working_directory\x18\x02 \x01(\tR\x10workingDirectory\x12Y\n" +
 	"\x10environment_vars\x18\x03 \x03(\v2..daemon.CreateTaskRequest.EnvironmentVarsEntryR\x0fenvironmentVars\x12*\n" +
-	"\x11anthropic_api_key\x18\x04 \x01(\tR\x0fanthropicApiKey\x1aB\n" +
+	"\x11anthropic_api_key\x18\x04 \x01(\tR\x0fanthropicApiKey\x12\x14\n" +
+	"\x05model\x18\x05 \x01(\tR\x05model\x1aB\n" +
 	"\x14EnvironmentVarsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"a\n" +
 	"\x12CreateTaskResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x17\n" +
 	"\atask_id\x18\x02 \x01(\tR\x06taskId\x12\x18\n" +
-	"\amessage\x18\x03 \x01(\tR\amessage\"\xa9\x02\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"\xbf\x02\n" +
 	"\x14ExecuteClaudeRequest\x12\x16\n" +
 	"\x06prompt\x18\x01 \x01(\tR\x06prompt\x12+\n" +
 	"\x11working_directory\x18\x02 \x01(\tR\x10workingDirectory\x12\\\n" +
 	"\x10environment_vars\x18\x03 \x03(\v21.daemon.ExecuteClaudeRequest.EnvironmentVarsEntryR\x0fenvironmentVars\x12*\n" +
-	"\x11anthropic_api_key\x18\x04 \x01(\tR\x0fanthropicApiKey\x1aB\n" +
+	"\x11anthropic_api_key\x18\x04 \x01(\tR\x0fanthropicApiKey\x12\x14\n" +
+	"\x05model\x18\x05 \x01(\tR\x05model\x1aB\n" +
 	"\x14EnvironmentVarsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x8c\x02\n" +

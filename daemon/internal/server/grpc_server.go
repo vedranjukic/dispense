@@ -135,7 +135,7 @@ func (s *AgentServiceServer) CreateTask(ctx context.Context, req *proto.CreateTa
 	log.Printf("AgentService.CreateTask called with prompt: %s", req.Prompt)
 
 	// Start Claude task using the task manager
-	taskID, err := s.taskManager.StartClaudeTask(req.Prompt, req.WorkingDirectory, req.AnthropicApiKey, req.EnvironmentVars)
+	taskID, err := s.taskManager.StartClaudeTask(req.Prompt, req.WorkingDirectory, req.AnthropicApiKey, req.Model, req.EnvironmentVars)
 	if err != nil {
 		log.Printf("Failed to start Claude task: %v", err)
 		return &proto.CreateTaskResponse{
@@ -156,7 +156,7 @@ func (s *AgentServiceServer) ExecuteClaude(req *proto.ExecuteClaudeRequest, stre
 	log.Printf("AgentService.ExecuteClaude called with prompt: %s", req.Prompt)
 
 	// Start Claude task
-	taskID, err := s.taskManager.StartClaudeTask(req.Prompt, req.WorkingDirectory, req.AnthropicApiKey, req.EnvironmentVars)
+	taskID, err := s.taskManager.StartClaudeTask(req.Prompt, req.WorkingDirectory, req.AnthropicApiKey, req.Model, req.EnvironmentVars)
 	if err != nil {
 		log.Printf("Failed to start Claude task: %v", err)
 		return stream.Send(&proto.ExecuteClaudeResponse{

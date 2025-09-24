@@ -55,7 +55,7 @@ func NewTaskManager(logDir string) *TaskManager {
 }
 
 // StartClaudeTask starts a new Claude execution task
-func (tm *TaskManager) StartClaudeTask(prompt, workingDir, apiKey string, envVars map[string]string) (string, error) {
+func (tm *TaskManager) StartClaudeTask(prompt, workingDir, apiKey, model string, envVars map[string]string) (string, error) {
 	tm.mutex.Lock()
 	defer tm.mutex.Unlock()
 
@@ -107,6 +107,11 @@ func (tm *TaskManager) StartClaudeTask(prompt, workingDir, apiKey string, envVar
 	} else {
 		log.Printf("No API key provided")
 	}
+	if model != "" {
+		log.Printf("Model specified: %s", model)
+	} else {
+		log.Printf("No model specified")
+	}
 
 	// Execute Claude synchronously and log output
 	go func() {
@@ -129,6 +134,14 @@ func (tm *TaskManager) StartClaudeTask(prompt, workingDir, apiKey string, envVar
 			cmd.Env = append(cmd.Env, fmt.Sprintf("ANTHROPIC_API_KEY=%s", apiKey))
 		} else {
 			log.Printf("No API key provided for task %s", taskID)
+		}
+
+		// Add ANTHROPIC_MODEL if provided
+		if model != "" {
+			log.Printf("Setting ANTHROPIC_MODEL environment variable for task %s", taskID)
+			cmd.Env = append(cmd.Env, fmt.Sprintf("ANTHROPIC_MODEL=%s", model))
+		} else {
+			log.Printf("No model provided for task %s", taskID)
 		}
 
 		for key, value := range envVars {

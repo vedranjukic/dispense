@@ -340,7 +340,9 @@ dispense version
 - `-g, --group <string>` - Optional group parameter for organizing sandboxes
 - `-m, --model <string>` - Optional model parameter for the sandbox
 - `--skip-copy` - Don't copy files to sandbox
-- `--skip-daemon` - Don't install daemon in sandbox
+- `--skip-daemon` - Don't install daemon in sandbo
+- `--cpu` - Limit cpu instances (local only)
+- `--memory` - Limit memory allocation (local only)
 
 ### Wait Command Flags
 - `--group <strings>` - Wait for all sandboxes in specified groups

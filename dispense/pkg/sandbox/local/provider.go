@@ -444,11 +444,6 @@ func (p *Provider) createContainer(containerName, projectPath string, opts *sand
 		args = append(args, "--label", fmt.Sprintf("dispense.group=%s", opts.Group))
 	}
 
-	// Add model label if specified
-	if opts.Model != "" {
-		args = append(args, "--label", fmt.Sprintf("dispense.model=%s", opts.Model))
-	}
-
 	// Add resource limits if specified
 	if opts.CPU > 0 {
 		args = append(args, "--cpus", fmt.Sprintf("%.1f", float64(opts.CPU)))

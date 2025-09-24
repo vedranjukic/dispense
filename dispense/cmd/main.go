@@ -77,6 +77,7 @@ func init() {
 	rootCmd.Flags().Int32P("auto-stop", "a", 60, "Auto-stop interval in minutes (0 = disabled, remote only)")
 	rootCmd.Flags().Bool("skip-copy", false, "Skip copying files to sandbox")
 	rootCmd.Flags().Bool("skip-daemon", false, "Skip installing daemon to sandbox")
+	rootCmd.Flags().String("model", "", "Anthropic model to use (e.g., claude-3-opus-20240229)")
 }
 
 func Execute() {
