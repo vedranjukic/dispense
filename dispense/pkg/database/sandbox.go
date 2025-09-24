@@ -20,6 +20,7 @@ type LocalSandbox struct {
 	ContainerID string                 `json:"container_id"`
 	Image       string                 `json:"image"`
 	State       string                 `json:"state"`
+	Group       string                 `json:"group,omitempty"` // Optional group parameter for querying
 	CreatedAt   time.Time              `json:"created_at"`
 	UpdatedAt   time.Time              `json:"updated_at"`
 	Ports       map[string]string      `json:"ports"`
@@ -182,6 +183,16 @@ func (sdb *SandboxDB) List() ([]*LocalSandbox, error) {
 	return sandboxes, nil
 }
 
+// ListByGroup retrieves all sandboxes in a specific group
+func (sdb *SandboxDB) ListByGroup(group string) ([]*LocalSandbox, error) {
+	var sandboxes []*LocalSandbox
+	err := sdb.db.Find("Group", group, &sandboxes)
+	if err != nil {
+		return nil, err
+	}
+	return sandboxes, nil
+}
+
 // Delete removes a sandbox from the database
 func (sdb *SandboxDB) Delete(id string) error {
 	var sandbox LocalSandbox
@@ -239,12 +250,21 @@ func FromSandboxInfo(info *sandbox.SandboxInfo, containerID, image, taskData str
 		}
 	}
 
+	// Extract group from metadata if present
+	group := ""
+	if groupData, exists := info.Metadata["group"]; exists {
+		if groupStr, ok := groupData.(string); ok {
+			group = groupStr
+		}
+	}
+
 	return &LocalSandbox{
 		ID:          info.ID,
 		Name:        info.Name,
 		ContainerID: containerID,
 		Image:       image,
 		State:       info.State,
+		Group:       group,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 		Ports:       ports,

@@ -23,6 +23,7 @@ var listCmd = &cobra.Command{
 		verbose, _ := cmd.Flags().GetBool("verbose")
 		showLocal, _ := cmd.Flags().GetBool("local")
 		showRemote, _ := cmd.Flags().GetBool("remote")
+		group, _ := cmd.Flags().GetString("group")
 
 		// If no specific flags, show both
 		if !showLocal && !showRemote {
@@ -71,7 +72,34 @@ var listCmd = &cobra.Command{
 		for _, provider := range providers {
 			utils.DebugPrintf("Listing sandboxes from %s provider\n", provider.GetType())
 
-			sandboxes, err := provider.List()
+			var sandboxes []*sandbox.SandboxInfo
+			var err error
+
+			// Check if group filtering is requested and provider supports it
+			if group != "" {
+				if localProvider, ok := provider.(*local.Provider); ok {
+					utils.DebugPrintf("Filtering by group: %s\n", group)
+					sandboxes, err = localProvider.ListByGroup(group)
+				} else {
+					// For remote providers, get all and filter manually for now
+					allProviderSandboxes, listErr := provider.List()
+					if listErr != nil {
+						fmt.Fprintf(os.Stderr, "Warning: Error listing %s sandboxes: %s\n", provider.GetType(), listErr)
+						continue
+					}
+					// Filter by group metadata
+					for _, sb := range allProviderSandboxes {
+						if groupValue, exists := sb.Metadata["group"]; exists {
+							if groupStr, ok := groupValue.(string); ok && groupStr == group {
+								sandboxes = append(sandboxes, sb)
+							}
+						}
+					}
+				}
+			} else {
+				sandboxes, err = provider.List()
+			}
+
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: Error listing %s sandboxes: %s\n", provider.GetType(), err)
 				continue
@@ -166,7 +194,7 @@ func formatMetadata(metadata map[string]interface{}) string {
 	for key, value := range metadata {
 		// Skip large objects, just show basic info
 		switch key {
-		case "container_name", "image", "ports":
+		case "container_name", "image", "ports", "group":
 			parts = append(parts, fmt.Sprintf("%s=%v", key, value))
 		case "daytona_sandbox":
 			parts = append(parts, "daytona=yes")
@@ -189,4 +217,5 @@ func init() {
 	listCmd.Flags().BoolP("verbose", "v", false, "Show detailed information")
 	listCmd.Flags().Bool("local", false, "Show only local Docker sandboxes")
 	listCmd.Flags().Bool("remote", false, "Show only remote Daytona sandboxes")
+	listCmd.Flags().StringP("group", "g", "", "Filter sandboxes by group")
 }

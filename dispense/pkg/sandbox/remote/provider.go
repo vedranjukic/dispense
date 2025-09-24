@@ -66,9 +66,19 @@ func (p *Provider) Create(opts *sandbox.CreateOptions) (*sandbox.SandboxInfo, er
 	utils.DebugPrintf("Generated slug: %s\n", slug)
 
 	// Create sandbox with the slug as dispense-name label
-	remoteSandbox, err := p.createSandboxWithLabel(slug, opts.Snapshot, opts.Target, opts.CPU, opts.Memory, opts.Disk, opts.AutoStop)
+	remoteSandbox, err := p.createSandboxWithLabel(slug, opts.Snapshot, opts.Target, opts.CPU, opts.Memory, opts.Disk, opts.AutoStop, opts.Group)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create remote sandbox: %w", err)
+	}
+
+	metadata := map[string]interface{}{
+		"daytona_sandbox": remoteSandbox,
+		"api_client":      p.apiClient,
+	}
+
+	// Add group to metadata if specified
+	if opts.Group != "" {
+		metadata["group"] = opts.Group
 	}
 
 	// Convert to our SandboxInfo format
@@ -78,10 +88,7 @@ func (p *Provider) Create(opts *sandbox.CreateOptions) (*sandbox.SandboxInfo, er
 		Type:         sandbox.TypeRemote,
 		State:        p.getSandboxState(remoteSandbox),
 		ShellCommand: fmt.Sprintf("ssh %s", slug),
-		Metadata: map[string]interface{}{
-			"daytona_sandbox": remoteSandbox,
-			"api_client":      p.apiClient,
-		},
+		Metadata:     metadata,
 	}
 
 	return sandboxInfo, nil
@@ -273,7 +280,7 @@ func (p *Provider) Delete(id string) error {
 
 // Helper methods (extracted from default.go)
 
-func (p *Provider) createSandboxWithLabel(dispenseName, snapshot, target string, cpu, memory, disk, autoStop int32) (*apiclient.Sandbox, error) {
+func (p *Provider) createSandboxWithLabel(dispenseName, snapshot, target string, cpu, memory, disk, autoStop int32, group string) (*apiclient.Sandbox, error) {
 	// Set default values if not provided
 	if snapshot == "" {
 		snapshot = "dispense-sandbox-001" // Default dispense snapshot
@@ -285,6 +292,11 @@ func (p *Provider) createSandboxWithLabel(dispenseName, snapshot, target string,
 	// Create labels map with dispense-name
 	labels := map[string]string{
 		"dispense-name": dispenseName,
+	}
+
+	// Add group label if specified
+	if group != "" {
+		labels["dispense-group"] = group
 	}
 
 	// Create environment variables

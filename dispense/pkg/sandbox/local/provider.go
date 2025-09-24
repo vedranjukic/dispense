@@ -105,19 +105,26 @@ func (p *Provider) Create(opts *sandbox.CreateOptions) (*sandbox.SandboxInfo, er
 	// Get container state
 	containerState := "running" // Assume running for now
 
+	metadata := map[string]interface{}{
+		"container_name": containerName,
+		"container_id":   containerID,
+		"image":         opts.Snapshot, // Use snapshot as Docker image
+		"project_path":  projectPath,
+		"ports":         []string{}, // TODO: Add port mappings
+	}
+
+	// Add group to metadata if specified
+	if opts.Group != "" {
+		metadata["group"] = opts.Group
+	}
+
 	sandboxInfo := &sandbox.SandboxInfo{
 		ID:           opts.BranchName, // Use user-friendly branch name as ID
 		Name:         opts.BranchName, // Use user-friendly branch name as name
 		Type:         sandbox.TypeLocal,
 		State:        containerState,
 		ShellCommand: fmt.Sprintf("docker exec -it %s /bin/bash", containerName),
-		Metadata: map[string]interface{}{
-			"container_name": containerName,
-			"container_id":   containerID,
-			"image":         opts.Snapshot, // Use snapshot as Docker image
-			"project_path":  projectPath,
-			"ports":         []string{}, // TODO: Add port mappings
-		},
+		Metadata:     metadata,
 	}
 
 	// Save to database for future reference
@@ -291,6 +298,26 @@ func (p *Provider) List() ([]*sandbox.SandboxInfo, error) {
 	return sandboxes, nil
 }
 
+// ListByGroup lists all local sandboxes in a specific group
+func (p *Provider) ListByGroup(group string) ([]*sandbox.SandboxInfo, error) {
+	utils.DebugPrintf("Listing local sandboxes in group: %s\n", group)
+
+	// Get sandboxes by group from database
+	localSandboxes, err := p.db.ListByGroup(group)
+	if err != nil {
+		utils.DebugPrintf("Failed to list by group from database: %v\n", err)
+		return []*sandbox.SandboxInfo{}, nil
+	}
+
+	// Convert to SandboxInfo slice
+	var sandboxes []*sandbox.SandboxInfo
+	for _, localSandbox := range localSandboxes {
+		sandboxes = append(sandboxes, localSandbox.ToSandboxInfo())
+	}
+
+	return sandboxes, nil
+}
+
 // Delete removes a local sandbox
 func (p *Provider) Delete(id string) error {
 	utils.DebugPrintf("Deleting local sandbox %s\n", id)
@@ -405,6 +432,11 @@ func (p *Provider) createContainer(containerName, projectPath string, opts *sand
 		"--label", "dispense.type=local",
 		imageName,
 		// "/bin/bash", "-c", "while true; do sleep 30; done", // Keep container running
+	}
+
+	// Add group label if specified
+	if opts.Group != "" {
+		args = append(args, "--label", fmt.Sprintf("dispense.group=%s", opts.Group))
 	}
 
 	// Add resource limits if specified

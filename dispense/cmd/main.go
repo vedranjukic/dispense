@@ -62,6 +62,7 @@ func init() {
 	rootCmd.AddCommand(newCmd)
 	rootCmd.AddCommand(deleteCmd)
 	rootCmd.AddCommand(claudeCmd)
+	rootCmd.AddCommand(waitCmd)
 	rootCmd.AddCommand(versionCmd)
 
 	// Add flags from newCmd to rootCmd so they work without specifying "new"
