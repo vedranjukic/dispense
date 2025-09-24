@@ -29,6 +29,7 @@ type CreateOptions struct {
 	TaskData     string  // JSON serialized task data
 	GitHubIssue  bool    // Indicates if this is for a GitHub issue (affects project setup)
 	Group        string  // Optional group parameter for organizing sandboxes
+	Model        string  // Optional model parameter
 }
 
 // SandboxInfo contains information about a created sandbox

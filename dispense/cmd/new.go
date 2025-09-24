@@ -48,6 +48,7 @@ var newCmd = &cobra.Command{
 		skipCopy, _ := cmd.Flags().GetBool("skip-copy")
 		skipDaemon, _ := cmd.Flags().GetBool("skip-daemon")
 		group, _ := cmd.Flags().GetString("group")
+		model, _ := cmd.Flags().GetString("model")
 
 		// Get branch name - either from flag or prompt
 		var branchName string
@@ -161,6 +162,7 @@ var newCmd = &cobra.Command{
 			TaskData:    taskDataJSON,
 			GitHubIssue: taskData != nil && taskData.GitHubIssue != nil,
 			Group:       group,
+			Model:       model,
 		}
 
 		// Create sandbox
@@ -865,6 +867,7 @@ func init() {
 	newCmd.Flags().Bool("skip-copy", false, "Skip copying files to sandbox")
 	newCmd.Flags().Bool("skip-daemon", false, "Skip installing daemon to sandbox")
 	newCmd.Flags().StringP("group", "g", "", "Optional group parameter for organizing sandboxes")
+	newCmd.Flags().StringP("model", "m", "", "Optional model parameter for the sandbox")
 }
 
 

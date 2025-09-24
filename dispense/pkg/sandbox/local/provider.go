@@ -118,6 +118,11 @@ func (p *Provider) Create(opts *sandbox.CreateOptions) (*sandbox.SandboxInfo, er
 		metadata["group"] = opts.Group
 	}
 
+	// Add model to metadata if specified
+	if opts.Model != "" {
+		metadata["model"] = opts.Model
+	}
+
 	sandboxInfo := &sandbox.SandboxInfo{
 		ID:           opts.BranchName, // Use user-friendly branch name as ID
 		Name:         opts.BranchName, // Use user-friendly branch name as name
@@ -437,6 +442,11 @@ func (p *Provider) createContainer(containerName, projectPath string, opts *sand
 	// Add group label if specified
 	if opts.Group != "" {
 		args = append(args, "--label", fmt.Sprintf("dispense.group=%s", opts.Group))
+	}
+
+	// Add model label if specified
+	if opts.Model != "" {
+		args = append(args, "--label", fmt.Sprintf("dispense.model=%s", opts.Model))
 	}
 
 	// Add resource limits if specified

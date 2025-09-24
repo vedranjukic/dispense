@@ -21,6 +21,7 @@ type LocalSandbox struct {
 	Image       string                 `json:"image"`
 	State       string                 `json:"state"`
 	Group       string                 `json:"group,omitempty"` // Optional group parameter for querying
+	Model       string                 `json:"model,omitempty"` // Optional model parameter
 	CreatedAt   time.Time              `json:"created_at"`
 	UpdatedAt   time.Time              `json:"updated_at"`
 	Ports       map[string]string      `json:"ports"`
@@ -258,6 +259,14 @@ func FromSandboxInfo(info *sandbox.SandboxInfo, containerID, image, taskData str
 		}
 	}
 
+	// Extract model from metadata if present
+	model := ""
+	if modelData, exists := info.Metadata["model"]; exists {
+		if modelStr, ok := modelData.(string); ok {
+			model = modelStr
+		}
+	}
+
 	return &LocalSandbox{
 		ID:          info.ID,
 		Name:        info.Name,
@@ -265,6 +274,7 @@ func FromSandboxInfo(info *sandbox.SandboxInfo, containerID, image, taskData str
 		Image:       image,
 		State:       info.State,
 		Group:       group,
+		Model:       model,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 		Ports:       ports,

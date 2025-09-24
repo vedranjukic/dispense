@@ -66,7 +66,7 @@ func (p *Provider) Create(opts *sandbox.CreateOptions) (*sandbox.SandboxInfo, er
 	utils.DebugPrintf("Generated slug: %s\n", slug)
 
 	// Create sandbox with the slug as dispense-name label
-	remoteSandbox, err := p.createSandboxWithLabel(slug, opts.Snapshot, opts.Target, opts.CPU, opts.Memory, opts.Disk, opts.AutoStop, opts.Group)
+	remoteSandbox, err := p.createSandboxWithLabel(slug, opts.Snapshot, opts.Target, opts.CPU, opts.Memory, opts.Disk, opts.AutoStop, opts.Group, opts.Model)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create remote sandbox: %w", err)
 	}
@@ -79,6 +79,11 @@ func (p *Provider) Create(opts *sandbox.CreateOptions) (*sandbox.SandboxInfo, er
 	// Add group to metadata if specified
 	if opts.Group != "" {
 		metadata["group"] = opts.Group
+	}
+
+	// Add model to metadata if specified
+	if opts.Model != "" {
+		metadata["model"] = opts.Model
 	}
 
 	// Convert to our SandboxInfo format
@@ -280,7 +285,7 @@ func (p *Provider) Delete(id string) error {
 
 // Helper methods (extracted from default.go)
 
-func (p *Provider) createSandboxWithLabel(dispenseName, snapshot, target string, cpu, memory, disk, autoStop int32, group string) (*apiclient.Sandbox, error) {
+func (p *Provider) createSandboxWithLabel(dispenseName, snapshot, target string, cpu, memory, disk, autoStop int32, group, model string) (*apiclient.Sandbox, error) {
 	// Set default values if not provided
 	if snapshot == "" {
 		snapshot = "dispense-sandbox-001" // Default dispense snapshot
@@ -297,6 +302,11 @@ func (p *Provider) createSandboxWithLabel(dispenseName, snapshot, target string,
 	// Add group label if specified
 	if group != "" {
 		labels["dispense-group"] = group
+	}
+
+	// Add model label if specified
+	if model != "" {
+		labels["dispense-model"] = model
 	}
 
 	// Create environment variables
