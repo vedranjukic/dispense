@@ -202,6 +202,15 @@ dispense --name my-project --remote
 # Force creation without git check
 dispense --name my-project --force
 
+# Create sandbox with group for organization
+dispense --name my-project --group issue-331
+
+# Create sandbox with model parameter
+dispense --name my-project --model claude-3-5-sonnet
+
+# Create sandbox with both group and model
+dispense --name my-project --group issue-331 --model claude-3-5-haiku --remote
+
 ```
 
 #### Create from existing directory
@@ -236,6 +245,23 @@ dispense shell my-project --local
 
 # Prefer remote sandbox
 dispense shell my-project --remote
+```
+
+#### Wait for Sandboxes
+Waits for all sandboxes to complete running tasks before exiting.
+
+```bash
+# Wait for specific sandboxes to be ready
+dispense wait my-project another-project
+
+# Wait for all sandboxes in a group
+dispense wait --group issue-331
+
+# Wait for sandboxes in multiple groups
+dispense wait --group issue-331 issue-332
+
+# Wait for specific sandboxes and groups
+dispense wait my-project --group issue-331
 ```
 
 #### Delete Sandbox
@@ -301,6 +327,8 @@ dispense version
 
 ## 🔧 Configuration Options
 
+### Sandbox Organization
+
 ### Global Flags
 - `-d, --debug` - Enable debug output
 - `-v, --version` - Show version information
@@ -309,8 +337,13 @@ dispense version
 ### Sandbox Creation Flags (`new` command)
 - `-n, --name <string>` - Specify sandbox name
 - `-r, --remote` - Use Daytona instead of Docker
+- `-g, --group <string>` - Optional group parameter for organizing sandboxes
+- `-m, --model <string>` - Optional model parameter for the sandbox
 - `--skip-copy` - Don't copy files to sandbox
 - `--skip-daemon` - Don't install daemon in sandbox
+
+### Wait Command Flags
+- `--group <strings>` - Wait for all sandboxes in specified groups
 
 ### Delete Command Flags
 - `-a, --all` - Delete all sandboxes from both local and remote providers
