@@ -49,6 +49,7 @@ var newCmd = &cobra.Command{
 		skipDaemon, _ := cmd.Flags().GetBool("skip-daemon")
 		group, _ := cmd.Flags().GetString("group")
 		model, _ := cmd.Flags().GetString("model")
+		task, _ := cmd.Flags().GetString("task")
 
 		// Get branch name - either from flag or prompt
 		var branchName string
@@ -63,11 +64,18 @@ var newCmd = &cobra.Command{
 			}
 		}
 
-		// Prompt for task description
-		taskDescription, err := promptForTask()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error getting task description: %s\n", err)
-			os.Exit(1)
+		// Get task description - either from flag or prompt
+		var taskDescription string
+		if task != "" {
+			taskDescription = task
+			fmt.Printf("Using provided task: %s\n", taskDescription)
+		} else {
+			var err error
+			taskDescription, err = promptForTask()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error getting task description: %s\n", err)
+				os.Exit(1)
+			}
 		}
 
 		// Parse task for GitHub issue if provided
@@ -868,6 +876,7 @@ func init() {
 	newCmd.Flags().Bool("skip-daemon", false, "Skip installing daemon to sandbox")
 	newCmd.Flags().StringP("group", "g", "", "Optional group parameter for organizing sandboxes")
 	newCmd.Flags().StringP("model", "m", "", "Optional model parameter for the sandbox")
+	newCmd.Flags().String("task", "", "Task description (skips task prompt)")
 }
 
 

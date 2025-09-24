@@ -78,6 +78,7 @@ func init() {
 	rootCmd.Flags().Bool("skip-copy", false, "Skip copying files to sandbox")
 	rootCmd.Flags().Bool("skip-daemon", false, "Skip installing daemon to sandbox")
 	rootCmd.Flags().String("model", "", "Anthropic model to use (e.g., claude-3-opus-20240229)")
+	rootCmd.Flags().String("task", "", "Task description (skips task prompt)")
 }
 
 func Execute() {
