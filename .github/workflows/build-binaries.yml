@@ -79,7 +79,9 @@ jobs:
             ./cmd/daemon.go \
             ./cmd/db.go \
             ./cmd/delete.go \
-            ./cmd/claude.go
+            ./cmd/claude.go \
+            ./cmd/wait.go \
+            ./cmd/mcp.go
 
       - name: Test binary
         if: matrix.goos == 'linux'

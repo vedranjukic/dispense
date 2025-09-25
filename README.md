@@ -129,6 +129,203 @@ Sometimes it's useful to connect to a sandbox with your favorite IDE in order to
 - **🚀 Local & Remote Support** - Use Docker locally or Daytona for remote environments
 - **🌳 GitHub Integration** - Create sandboxes directly from GitHub issues
 - **⚡ Background Tasks** - Leave tasks running while you work on other things
+- **🤖 MCP Integration** - Built-in Model Context Protocol server for AI assistant integration
+
+## 🤖 MCP Integration
+
+Dispense includes built-in **Model Context Protocol (MCP)** support, allowing AI assistants like Claude Code to interact with dispense commands through structured function calls. The MCP server is bundled directly into the dispense binary and provides configuration management for easy setup.
+
+### Quick Setup
+
+1. **Generate MCP configuration:**
+   ```bash
+   dispense mcp --config
+   ```
+
+2. **Save configuration to file:**
+   ```bash
+   dispense mcp --save-config
+   ```
+
+3. **Copy the generated JSON to your MCP client configuration**
+
+### Configuration Management
+
+#### Config File Location
+- **Linux/macOS**: `~/.config/dispense/mcp.json`
+- **Custom location**: Set `XDG_CONFIG_HOME` environment variable
+
+#### Configuration Priority (highest to lowest)
+1. **Environment variables** (override everything)
+2. **Config file** (`~/.config/dispense/mcp.json`)
+3. **Default values**
+
+#### Available Configuration Options
+```json
+{
+  "binary_path": "/path/to/dispense",
+  "default_timeout": "30s",
+  "long_timeout": "10m0s",
+  "log_level": "info",
+  "max_concurrent_ops": 10
+}
+```
+
+#### Environment Variables
+Override any config file setting:
+- `DISPENSE_BINARY_PATH` - Path to dispense binary
+- `DISPENSE_DEFAULT_TIMEOUT` - Default command timeout (e.g., "45s")
+- `DISPENSE_LONG_TIMEOUT` - Long operation timeout (e.g., "15m")
+- `DISPENSE_LOG_LEVEL` - Logging level (debug, info, warn, error)
+
+### Configuring Claude Code
+
+#### Step 1: Get Your Configuration
+```bash
+# Show current config and get MCP client JSON
+dispense mcp --config
+```
+
+This will display your configuration and provide a ready-to-use JSON snippet.
+
+#### Step 2: Add to Claude Code
+
+**Location of Claude Code MCP config:**
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+
+**Add the dispense MCP server:**
+```json
+{
+  "mcpServers": {
+    "dispense": {
+      "command": "/usr/local/bin/dispense",
+      "args": ["mcp"],
+      "env": {
+        "DISPENSE_LOG_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+**Example complete configuration:**
+```json
+{
+  "mcpServers": {
+    "dispense": {
+      "command": "/usr/local/bin/dispense",
+      "args": ["mcp"],
+      "env": {
+        "DISPENSE_LOG_LEVEL": "info"
+      }
+    },
+    "other-mcp-server": {
+      "command": "/path/to/other-server",
+      "args": ["--stdio"]
+    }
+  }
+}
+```
+
+#### Step 3: Restart Claude Code
+After adding the configuration, restart Claude Code to load the new MCP server.
+
+#### Step 4: Verify Integration
+Claude Code should now have access to dispense tools. You can ask Claude to:
+- "Create a new sandbox for this GitHub issue"
+- "Set up an isolated environment for development"
+
+### Available MCP Tools
+
+When running in MCP mode, dispense exposes these tools to AI assistants:
+
+- **`dispense_create_sandbox`** - Create new sandboxes for GitHub issues or local development
+  - Parameters: `name` (required), `task` (required), `remote` (optional)
+  - Creates isolated Docker containers or remote Daytona environments
+
+### MCP Server Commands
+
+#### Start MCP Server
+```bash
+# Production mode
+dispense mcp
+
+# With debug logging
+dispense mcp --log-level debug
+```
+
+#### Development with Nx
+```bash
+# Start MCP server in development mode
+yarn nx server dispense
+
+# With extra debug logging
+yarn nx server dispense --configuration=debug
+
+# Using the built binary (faster startup)
+yarn nx server dispense --configuration=production
+```
+
+#### Configuration Commands
+```bash
+# Show current configuration and file location
+dispense mcp --config
+
+# Save current configuration to file
+dispense mcp --save-config
+
+# Start server with custom log level
+dispense mcp --log-level debug
+```
+
+### Troubleshooting MCP Integration
+
+#### Common Issues
+
+1. **Claude Code doesn't see dispense tools**
+   - Verify the binary path in your config: `dispense mcp --config`
+   - Check Claude Code logs for MCP connection errors
+   - Ensure the dispense binary is executable: `chmod +x /path/to/dispense`
+
+2. **Permission denied errors**
+   - Make sure the dispense binary path is correct and executable
+   - On macOS, you may need to allow the binary in Security & Privacy settings
+
+3. **Configuration not loading**
+   - Check if config file exists: `dispense mcp --config`
+   - Verify config file syntax is valid JSON
+   - Use environment variables to override config: `DISPENSE_LOG_LEVEL=debug dispense mcp`
+
+#### Debug Mode
+Enable debug logging to troubleshoot issues:
+```bash
+# Via command line
+dispense mcp --log-level debug
+
+# Via environment variable
+DISPENSE_LOG_LEVEL=debug dispense mcp
+
+# In Claude Code config
+{
+  "mcpServers": {
+    "dispense": {
+      "command": "/path/to/dispense",
+      "args": ["mcp", "--log-level", "debug"]
+    }
+  }
+}
+```
+
+### Benefits of MCP Integration
+
+- **Structured Communication** - AI assistants can reliably create sandboxes with proper validation
+- **Error Handling** - Clear success/failure feedback with detailed error messages
+- **Type Safety** - Parameter validation ensures correct sandbox creation
+- **Configuration Management** - Easy setup and customization through config files
+- **Development Workflow** - Seamless integration with development and production environments
+- **Integration Ready** - Works with Claude Code and other MCP-compatible tools
 
 ## 🚀 Quick Start
 
@@ -303,6 +500,26 @@ dispense claude my-project tasks <task-id>
 # View task logs
 dispense claude my-project logs <task-id>
 ```
+
+### MCP Server Mode
+
+Start the built-in MCP server for AI assistant integration:
+
+```bash
+# Start MCP server (communicates via stdin/stdout)
+dispense mcp
+
+# Start with debug logging
+dispense mcp --log-level debug
+
+# Show current configuration and get client config JSON
+dispense mcp --config
+
+# Save current configuration to file (~/.config/dispense/mcp.json)
+dispense mcp --save-config
+```
+
+The MCP server allows AI assistants like Claude Code to create and manage sandboxes through structured function calls. For complete setup instructions including Claude Code configuration, see the [MCP Integration](#-mcp-integration) section.
 
 ### Shell Completion
 ```bash

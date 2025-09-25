@@ -18,6 +18,18 @@ npx nx run dispense:build-darwin-arm64
 
 # Build for all platforms
 npx nx run dispense:build-all
+
+# Run the application (development)
+npx nx run dispense:serve [args]
+
+# Start MCP server mode (development)
+npx nx run dispense:server
+
+# Start MCP server with debug logging
+npx nx run dispense:server --configuration=debug
+
+# Start MCP server using built binary
+npx nx run dispense:server --configuration=production
 ```
 
 ### Make Commands
@@ -66,6 +78,7 @@ All binaries are built in the project root `dist/dispense/` directory:
 - **Static binaries**: CGO disabled for maximum compatibility
 - **Version metadata**: Git commit, build time, and version information embedded
 - **Build verification**: File size reporting and build success confirmation
+- **MCP Integration**: Built-in Model Context Protocol server for AI assistant integration
 
 ## Version Information
 
@@ -79,6 +92,59 @@ The Dispense binary includes a `version` command that displays:
 ```bash
 ./dist/dispense/dispense-linux-amd64 version
 ```
+
+## MCP (Model Context Protocol) Support
+
+The dispense binary includes built-in MCP server functionality, allowing AI assistants to interact with dispense commands through structured function calls.
+
+### Available Commands
+
+```bash
+# Start MCP server (for MCP client integration)
+./dist/dispense/dispense mcp
+
+# With debug logging
+./dist/dispense/dispense mcp --debug --log-level debug
+
+# Show MCP command help
+./dist/dispense/dispense mcp --help
+```
+
+### Development with Nx
+
+```bash
+# Start MCP server in development mode
+yarn nx server dispense
+
+# With extra debug logging
+yarn nx server dispense --configuration=debug
+
+# Using the built binary (faster startup)
+yarn nx server dispense --configuration=production
+```
+
+### MCP Client Integration
+
+Use this configuration in MCP clients like Claude Code:
+
+```json
+{
+  "mcpServers": {
+    "dispense": {
+      "command": "/path/to/dist/dispense/dispense",
+      "args": ["mcp"],
+      "env": {
+        "DISPENSE_LOG_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+### Available MCP Tools
+
+- **`dispense_create_sandbox`** - Create new sandboxes for GitHub issues
+- **More tools coming soon** - Additional sandbox management capabilities
 
 ## Build Requirements
 

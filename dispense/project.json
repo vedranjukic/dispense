@@ -43,8 +43,23 @@
     "serve": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "go run ./cmd/*.go {args}",
+        "command": "go run ./cmd/*.go new {args}",
         "cwd": "dispense"
+      }
+    },
+    "server": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "go run ./cmd/*.go mcp --debug",
+        "cwd": "dispense"
+      },
+      "configurations": {
+        "debug": {
+          "command": "go run ./cmd/*.go mcp --debug --log-level debug"
+        },
+        "production": {
+          "command": "../dist/dispense/dispense mcp"
+        }
       }
     },
     "test": {
