@@ -1181,3 +1181,23 @@ func (p *Provider) GetWorkDir(sandboxInfo *sandbox.SandboxInfo) (string, error) 
 	}
 	return workspacePath, nil
 }
+
+// ExecuteCommand executes a command in the remote sandbox using Daytona API
+func (p *Provider) ExecuteCommand(sandboxInfo *sandbox.SandboxInfo, command string) (*sandbox.ExecResult, error) {
+	utils.DebugPrintf("Executing command in remote sandbox %s: %s\n", sandboxInfo.ID, command)
+
+	// Execute command using Daytona API
+	response, err := p.apiClient.RunCommand(sandboxInfo.ID, command, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute command via Daytona API: %w", err)
+	}
+
+	result := &sandbox.ExecResult{
+		Stdout:   response.Output,
+		Stderr:   "", // Daytona API combines stdout and stderr in Output
+		ExitCode: response.ExitCode,
+	}
+
+	utils.DebugPrintf("Command completed with exit code: %d\n", response.ExitCode)
+	return result, nil
+}

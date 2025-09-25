@@ -147,7 +147,17 @@ func (m *Manager) copyProjectFiles(sourceDir, destDir string) (string, error) {
 	}
 
 	// Copy files using cp command for better performance and preservation of permissions
-	copyCmd := exec.Command("cp", "-r", sourceDir+"/.", destDir)
+	// Use a more robust approach to copy directory contents
+	var copyCmd *exec.Cmd
+	if sourceDir == "/" {
+		// Special case for root directory - we don't want to copy the entire filesystem
+		return "", fmt.Errorf("cannot copy from root directory '/' - this would copy the entire filesystem")
+	} else {
+		// For normal directories, copy all contents using shell glob expansion
+		copyCmd = exec.Command("sh", "-c", fmt.Sprintf("cp -r %s/* %s/ 2>/dev/null || true && cp -r %s/.[^.]* %s/ 2>/dev/null || true",
+			sourceDir, destDir, sourceDir, destDir))
+	}
+
 	output, err := copyCmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to copy files: %w\\nOutput: %s", err, string(output))

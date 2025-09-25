@@ -30,9 +30,14 @@ var rootCmd = &cobra.Command{
 		}
 
 		// If no arguments provided, run the new command (default behavior)
-		utils.DebugPrintf("No specific command, running new command\n")
-		// Execute the new command
-		newCmd.Run(cmd, args)
+		if len(args) == 0 {
+			utils.DebugPrintf("No arguments, running new command\n")
+			newCmd.Run(cmd, args)
+			return
+		}
+
+		// If we get here, show help since the command wasn't recognized
+		cmd.Help()
 	},
 }
 
@@ -65,6 +70,7 @@ func init() {
 	rootCmd.AddCommand(waitCmd)
 	rootCmd.AddCommand(mcpCmd)
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(execCmd)
 
 	// Add flags from newCmd to rootCmd so they work without specifying "new"
 	rootCmd.Flags().BoolP("remote", "r", false, "Create remote sandbox using Daytona API (default: local Docker)")

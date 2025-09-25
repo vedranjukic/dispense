@@ -42,6 +42,13 @@ type SandboxInfo struct {
 	Metadata     map[string]interface{}
 }
 
+// ExecResult contains the result of command execution
+type ExecResult struct {
+	Stdout   string
+	Stderr   string
+	ExitCode int
+}
+
 // Provider defines the interface for sandbox providers
 type Provider interface {
 	// Create creates a new sandbox
@@ -73,6 +80,9 @@ type Provider interface {
 
 	// GetWorkDir returns the working directory path for the sandbox environment
 	GetWorkDir(sandboxInfo *SandboxInfo) (string, error)
+
+	// ExecuteCommand executes a command in the sandbox and returns the result
+	ExecuteCommand(sandboxInfo *SandboxInfo, command string) (*ExecResult, error)
 }
 
 // These will be implemented by importing the specific provider packages

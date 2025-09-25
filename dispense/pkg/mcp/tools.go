@@ -15,6 +15,7 @@ type CreateSandboxParams struct {
 	Name   string `json:"name" validate:"required,min=1,max=50"`
 	Task   string `json:"task" validate:"required,min=10"`
 	Remote bool   `json:"remote,omitempty"`
+	Model  string `json:"model,omitempty"`
 }
 
 // CreateSandboxResult represents the result of sandbox creation
@@ -59,6 +60,9 @@ func CreateSandbox(executor CommandExecutor, config *Config) mcp.ToolHandlerFor[
 		args := []string{"new", "--name", p.Name, "--task", p.Task}
 		if p.Remote {
 			args = append(args, "--remote")
+		}
+		if p.Model != "" {
+			args = append(args, "--model", p.Model)
 		}
 
 		// Execute command with appropriate timeout
@@ -170,4 +174,94 @@ func parseCreateOutput(output string) *CreateResult {
 	}
 
 	return result
+}
+
+// ExecSandboxParams represents the parameters for executing a command in a sandbox
+type ExecSandboxParams struct {
+	Name    string `json:"name" validate:"required,min=1"`
+	Command string `json:"command" validate:"required,min=1"`
+}
+
+// ExecSandboxResult represents the result of command execution
+type ExecSandboxResult struct {
+	Success      bool   `json:"success"`
+	Stdout       string `json:"stdout"`
+	Stderr       string `json:"stderr"`
+	ExitCode     int    `json:"exit_code"`
+	ErrorMessage string `json:"error_message,omitempty"`
+}
+
+// ExecCommand executes a command in a sandbox and returns output and exit code
+func ExecCommand(executor CommandExecutor, config *Config) mcp.ToolHandlerFor[ExecSandboxParams, ExecSandboxResult] {
+	validate := validator.New()
+
+	return func(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[ExecSandboxParams]) (*mcp.CallToolResultFor[ExecSandboxResult], error) {
+		p := params.Arguments
+
+		// Validate parameters with user-friendly messages
+		if err := validate.Struct(p); err != nil {
+			if p.Name == "" {
+				return nil, fmt.Errorf("sandbox name is required")
+			}
+			if p.Command == "" {
+				return nil, fmt.Errorf("command is required")
+			}
+			return nil, fmt.Errorf("parameter validation failed: %w", err)
+		}
+
+		// Build command arguments for dispense exec
+		args := []string{"exec", p.Name, p.Command}
+
+		// Execute command with appropriate timeout
+		result, err := executor.ExecuteWithTimeout(args, config.DefaultTimeout)
+
+		// Prepare result - always return a result even if execution fails
+		toolResult := ExecSandboxResult{
+			Success:  false,
+			Stdout:   result.Stdout,
+			Stderr:   result.Stderr,
+			ExitCode: result.ExitCode,
+		}
+
+		if err != nil {
+			toolResult.ErrorMessage = fmt.Sprintf("Failed to execute command: %v", err)
+		} else {
+			toolResult.Success = true
+		}
+
+		// Prepare response content
+		var responseText string
+		if toolResult.Success {
+			responseText = fmt.Sprintf("✅ Command executed in sandbox '%s'\n", p.Name)
+			responseText += fmt.Sprintf("📋 Command: %s\n", p.Command)
+			responseText += fmt.Sprintf("🔢 Exit Code: %d\n", toolResult.ExitCode)
+
+			if toolResult.Stdout != "" {
+				responseText += fmt.Sprintf("\n📄 Output:\n%s", toolResult.Stdout)
+			}
+
+			if toolResult.Stderr != "" {
+				responseText += fmt.Sprintf("\n⚠️ Error Output:\n%s", toolResult.Stderr)
+			}
+		} else {
+			responseText = fmt.Sprintf("❌ Command execution failed in sandbox '%s'\n", p.Name)
+			responseText += fmt.Sprintf("📋 Command: %s\n", p.Command)
+			responseText += fmt.Sprintf("🔢 Exit Code: %d\n", toolResult.ExitCode)
+
+			if toolResult.ErrorMessage != "" {
+				responseText += fmt.Sprintf("💥 Error: %s\n", toolResult.ErrorMessage)
+			}
+
+			if toolResult.Stderr != "" {
+				responseText += fmt.Sprintf("\n⚠️ Error Output:\n%s", toolResult.Stderr)
+			}
+		}
+
+		return &mcp.CallToolResultFor[ExecSandboxResult]{
+			Content: []mcp.Content{
+				&mcp.TextContent{Text: responseText},
+			},
+			StructuredContent: toolResult,
+		}, nil
+	}
 }
