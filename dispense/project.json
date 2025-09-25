@@ -43,7 +43,7 @@
     "serve": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "go run ./cmd/*.go new {args}",
+        "command": "go run ./cmd/*.go {args}",
         "cwd": "dispense"
       }
     },

@@ -74,6 +74,10 @@ func (p *Provider) Create(opts *sandbox.CreateOptions) (*sandbox.SandboxInfo, er
 		// For GitHub issues, create an empty directory - repo will be cloned into container later
 		utils.DebugPrintf("GitHub issue detected, creating empty project directory for repo clone\n")
 		projectPath, err = p.projectManager.SetupEmptyProject(containerName)
+	} else if opts.SkipCopy || opts.SourceDir == "" {
+		// For skip-copy or empty source directory, create an empty project directory
+		utils.DebugPrintf("Skip copy or empty source directory, creating empty project directory\n")
+		projectPath, err = p.projectManager.SetupEmptyProject(containerName)
 	} else {
 		// Normal setup: git worktree or file copy
 		// Use the original branch name for git branch creation, containerName for directory
@@ -798,4 +802,54 @@ func (p *Provider) parseContainerStatus(status string) string {
 func (p *Provider) GetWorkDir(sandboxInfo *sandbox.SandboxInfo) (string, error) {
 	// Local provider always uses /workspace as the working directory
 	return "/workspace", nil
+}
+
+// ExecuteCommand executes a command in the local sandbox container
+func (p *Provider) ExecuteCommand(sandboxInfo *sandbox.SandboxInfo, command string) (*sandbox.ExecResult, error) {
+	utils.DebugPrintf("Executing command in local sandbox %s: %s\n", sandboxInfo.ID, command)
+
+	// Get container ID from metadata
+	containerID, ok := sandboxInfo.Metadata["container_id"].(string)
+	if !ok {
+		return nil, fmt.Errorf("container ID not found in sandbox metadata")
+	}
+
+	// Execute command using docker exec
+	cmd := exec.Command("docker", "exec", containerID, "/bin/sh", "-c", command)
+
+	// Capture stdout and stderr separately
+	stdout, stderr, exitCode, err := p.execCommandWithOutput(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute command: %w", err)
+	}
+
+	result := &sandbox.ExecResult{
+		Stdout:   stdout,
+		Stderr:   stderr,
+		ExitCode: exitCode,
+	}
+
+	utils.DebugPrintf("Command completed with exit code: %d\n", exitCode)
+	return result, nil
+}
+
+// execCommandWithOutput executes a command and captures stdout, stderr, and exit code
+func (p *Provider) execCommandWithOutput(cmd *exec.Cmd) (string, string, int, error) {
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	exitCode := 0
+
+	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			exitCode = exitError.ExitCode()
+		} else {
+			// If we can't get the exit code, return the error
+			return "", "", -1, err
+		}
+	}
+
+	return stdout.String(), stderr.String(), exitCode, nil
 }

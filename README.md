@@ -242,8 +242,14 @@ Claude Code should now have access to dispense tools. You can ask Claude to:
 When running in MCP mode, dispense exposes these tools to AI assistants:
 
 - **`dispense_create_sandbox`** - Create new sandboxes for GitHub issues or local development
-  - Parameters: `name` (required), `task` (required), `remote` (optional)
+  - Parameters: `name` (required), `task` (required), `remote` (optional), `model` (optional)
   - Creates isolated Docker containers or remote Daytona environments
+  - Model parameter allows specifying the Anthropic model for Claude Code (e.g., claude-3-5-sonnet-20241022, claude-3-opus-20240229)
+
+- **`dispense_exec_command`** - Execute commands in sandboxes and return output
+  - Parameters: `name` (required), `command` (required)
+  - Returns stdout, stderr, and exit code from command execution
+  - Works with both local Docker containers and remote Daytona sandboxes
 
 ### MCP Server Commands
 
@@ -444,6 +450,31 @@ dispense shell my-project --local
 dispense shell my-project --remote
 ```
 
+#### Execute Commands in Sandbox
+Execute commands in sandboxes and get their output, stderr, and exit code. Works with both local Docker containers and remote Daytona sandboxes.
+
+```bash
+# Execute a simple command
+dispense exec my-project "ls -la"
+
+# Copy files within the sandbox
+dispense exec my-project "cp -r /source /destination"
+
+# Run a script or complex command
+dispense exec my-project "echo 'Hello World' > test.txt && cat test.txt"
+
+# Check status or run diagnostics
+dispense exec my-project "ps aux | grep dispensed"
+
+# Prefer local sandbox
+dispense exec my-project "pwd" --local
+
+# Prefer remote sandbox
+dispense exec my-project "pwd" --remote
+```
+
+The exec command returns the output to stdout/stderr and exits with the same code as the executed command, making it perfect for automation and scripting.
+
 #### Wait for Sandboxes
 Waits for all sandboxes to complete running tasks before exiting.
 
@@ -574,6 +605,10 @@ dispense version
 - `-v, --verbose` - Show detailed information
 
 ### Shell/SSH Command Flags
+- `--local` - Prefer local Docker sandboxes
+- `--remote` - Prefer remote Daytona sandboxes
+
+### Exec Command Flags
 - `--local` - Prefer local Docker sandboxes
 - `--remote` - Prefer remote Daytona sandboxes
 

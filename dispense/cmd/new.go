@@ -101,7 +101,7 @@ var newCmd = &cobra.Command{
 
 		if !skipCopy {
 			// Get the source directory
-			sourceDirectory, err := os.Getwd()
+			sourceDirectory, err = os.Getwd()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error getting current directory: %s\n", err)
 				os.Exit(1)

@@ -81,7 +81,8 @@ jobs:
             ./cmd/delete.go \
             ./cmd/claude.go \
             ./cmd/wait.go \
-            ./cmd/mcp.go
+            ./cmd/mcp.go \
+            ./cmd/exec.go
 
       - name: Test binary
         if: matrix.goos == 'linux'
