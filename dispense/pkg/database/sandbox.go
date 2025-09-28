@@ -15,18 +15,19 @@ import (
 
 // LocalSandbox represents a local sandbox stored in the database
 type LocalSandbox struct {
-	ID          string                 `storm:"id" json:"id"`
-	Name        string                 `storm:"unique" json:"name"`
-	ContainerID string                 `json:"container_id"`
-	Image       string                 `json:"image"`
-	State       string                 `json:"state"`
-	Group       string                 `json:"group,omitempty"` // Optional group parameter for querying
-	Model       string                 `json:"model,omitempty"` // Optional model parameter
-	CreatedAt   time.Time              `json:"created_at"`
-	UpdatedAt   time.Time              `json:"updated_at"`
-	Ports       map[string]string      `json:"ports"`
-	Metadata    map[string]interface{} `json:"metadata"`
-	TaskData    string                 `json:"task_data,omitempty"` // JSON serialized task data
+	ID            string                 `storm:"id" json:"id"`
+	Name          string                 `storm:"unique" json:"name"`
+	ContainerID   string                 `json:"container_id"`
+	Image         string                 `json:"image"`
+	State         string                 `json:"state"`
+	Group         string                 `json:"group,omitempty"`         // Optional group parameter for querying
+	Model         string                 `json:"model,omitempty"`         // Optional model parameter
+	ProjectSource string                 `json:"project_source,omitempty"` // Project source (SourceDirectory or GitHub repo URL)
+	CreatedAt     time.Time              `json:"created_at"`
+	UpdatedAt     time.Time              `json:"updated_at"`
+	Ports         map[string]string      `json:"ports"`
+	Metadata      map[string]interface{} `json:"metadata"`
+	TaskData      string                 `json:"task_data,omitempty"` // JSON serialized task data
 }
 
 // SandboxDB provides database operations for local sandboxes
@@ -233,12 +234,13 @@ func (ls *LocalSandbox) ToSandboxInfo() *sandbox.SandboxInfo {
 	shellCommand := fmt.Sprintf("docker exec -it %s /bin/bash", containerName)
 
 	return &sandbox.SandboxInfo{
-		ID:           ls.ID,
-		Name:         ls.Name,
-		Type:         sandbox.TypeLocal,
-		State:        ls.State,
-		ShellCommand: shellCommand,
-		Metadata:     ls.Metadata,
+		ID:            ls.ID,
+		Name:          ls.Name,
+		Type:          sandbox.TypeLocal,
+		State:         ls.State,
+		ShellCommand:  shellCommand,
+		ProjectSource: ls.ProjectSource,
+		Metadata:      ls.Metadata,
 	}
 }
 
@@ -268,17 +270,18 @@ func FromSandboxInfo(info *sandbox.SandboxInfo, containerID, image, taskData str
 	}
 
 	return &LocalSandbox{
-		ID:          info.ID,
-		Name:        info.Name,
-		ContainerID: containerID,
-		Image:       image,
-		State:       info.State,
-		Group:       group,
-		Model:       model,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-		Ports:       ports,
-		Metadata:    info.Metadata,
-		TaskData:    taskData,
+		ID:            info.ID,
+		Name:          info.Name,
+		ContainerID:   containerID,
+		Image:         image,
+		State:         info.State,
+		Group:         group,
+		Model:         model,
+		ProjectSource: info.ProjectSource,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+		Ports:         ports,
+		Metadata:      info.Metadata,
+		TaskData:      taskData,
 	}
 }

@@ -8,6 +8,7 @@ import (
 
 	"cli/internal/core/errors"
 	"cli/internal/core/models"
+	"cli/pkg/database"
 	"cli/pkg/sandbox"
 	"cli/pkg/sandbox/local"
 	"cli/pkg/sandbox/remote"
@@ -40,6 +41,9 @@ func (s *SandboxService) Create(req *models.SandboxCreateRequest) (*models.Sandb
 
 	// Auto-configure based on task data
 	s.autoConfigureFromTask(req)
+
+	// Determine project source
+	projectSource := s.determineProjectSource(req)
 
 	// Create appropriate provider
 	provider, err := s.createProvider(req.IsRemote)
@@ -75,6 +79,17 @@ func (s *SandboxService) Create(req *models.SandboxCreateRequest) (*models.Sandb
 	sandboxInfo, err := provider.Create(opts)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeSandboxCreateFailed, "failed to create sandbox")
+	}
+
+	// Set project source in the created sandbox info
+	sandboxInfo.ProjectSource = projectSource
+
+	// Update the database with the ProjectSource (for local sandboxes)
+	if sandboxInfo.Type == sandbox.TypeLocal {
+		if err := s.updateLocalSandboxProjectSource(sandboxInfo.ID, projectSource); err != nil {
+			// Log warning but don't fail creation
+			fmt.Fprintf(os.Stderr, "Warning: Failed to update ProjectSource in database: %v\n", err)
+		}
 	}
 
 	return s.convertSandboxInfo(sandboxInfo), nil
@@ -128,6 +143,31 @@ func (s *SandboxService) List(opts *models.SandboxListOptions) ([]*models.Sandbo
 	}
 
 	return allSandboxes, nil
+}
+
+// GetProjectSources returns a list of distinct ProjectSource values from all sandboxes
+func (s *SandboxService) GetProjectSources(opts *models.SandboxListOptions) ([]string, error) {
+	// Get all sandboxes
+	sandboxes, err := s.List(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	// Use a map to track distinct ProjectSource values
+	projectSourcesMap := make(map[string]bool)
+	for _, sb := range sandboxes {
+		if sb.ProjectSource != "" {
+			projectSourcesMap[sb.ProjectSource] = true
+		}
+	}
+
+	// Convert map keys to slice
+	var projectSources []string
+	for projectSource := range projectSourcesMap {
+		projectSources = append(projectSources, projectSource)
+	}
+
+	return projectSources, nil
 }
 
 // Delete deletes a sandbox or all sandboxes based on the provided options
@@ -234,6 +274,27 @@ func (s *SandboxService) autoConfigureFromTask(req *models.SandboxCreateRequest)
 	}
 }
 
+// determineProjectSource determines the project source based on the request
+func (s *SandboxService) determineProjectSource(req *models.SandboxCreateRequest) string {
+	// If task data contains GitHub issue or PR, use the GitHub repo URL
+	if req.TaskData != nil {
+		if req.TaskData.GitHubIssue != nil {
+			return fmt.Sprintf("https://github.com/%s/%s", req.TaskData.GitHubIssue.Owner, req.TaskData.GitHubIssue.Repo)
+		}
+		if req.TaskData.GitHubPR != nil {
+			return fmt.Sprintf("https://github.com/%s/%s", req.TaskData.GitHubPR.Owner, req.TaskData.GitHubPR.Repo)
+		}
+	}
+
+	// Otherwise, use SourceDirectory
+	if req.SourceDirectory != "" {
+		return req.SourceDirectory
+	}
+
+	// Default to SourceDirectory literal
+	return "SourceDirectory"
+}
+
 // createProvider creates appropriate sandbox provider
 func (s *SandboxService) createProvider(isRemote bool) (sandbox.Provider, error) {
 	if isRemote {
@@ -249,6 +310,31 @@ func (s *SandboxService) createProvider(isRemote bool) (sandbox.Provider, error)
 		return nil, errors.Wrap(err, errors.ErrCodeProviderUnavailable, "failed to create local provider")
 	}
 	return provider, nil
+}
+
+// updateLocalSandboxProjectSource updates the ProjectSource field for a local sandbox in the database
+func (s *SandboxService) updateLocalSandboxProjectSource(sandboxID, projectSource string) error {
+	// Get the database instance directly
+	db, err := database.GetSandboxDB()
+	if err != nil {
+		return fmt.Errorf("failed to get database instance: %w", err)
+	}
+
+	// Get the sandbox from database
+	localSandbox, err := db.GetByID(sandboxID)
+	if err != nil {
+		// Try by name if ID lookup failed
+		localSandbox, err = db.GetByName(sandboxID)
+		if err != nil {
+			return fmt.Errorf("sandbox not found in database: %w", err)
+		}
+	}
+
+	// Update the ProjectSource
+	localSandbox.ProjectSource = projectSource
+
+	// Save the updated sandbox
+	return db.Update(localSandbox)
 }
 
 // getLocalSandboxes retrieves local sandboxes
@@ -333,11 +419,12 @@ func (s *SandboxService) deleteSingleSandbox(identifier string, force bool) erro
 // convertSandboxInfo converts from sandbox package format to models format
 func (s *SandboxService) convertSandboxInfo(sb *sandbox.SandboxInfo) *models.SandboxInfo {
 	return &models.SandboxInfo{
-		ID:           sb.ID,
-		Name:         sb.Name,
-		Type:         models.SandboxType(sb.Type),
-		State:        sb.State,
-		ShellCommand: sb.ShellCommand,
-		Metadata:     sb.Metadata,
+		ID:            sb.ID,
+		Name:          sb.Name,
+		Type:          models.SandboxType(sb.Type),
+		State:         sb.State,
+		ShellCommand:  sb.ShellCommand,
+		ProjectSource: sb.ProjectSource,
+		Metadata:      sb.Metadata,
 	}
 }

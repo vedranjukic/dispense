@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
+	"sort"
 	"text/tabwriter"
 
 	"cli/pkg/sandbox"
@@ -14,13 +14,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all sandboxes",
-	Long:  `List all sandboxes from both local Docker containers and remote Daytona API.`,
+var projectSourcesCmd = &cobra.Command{
+	Use:   "project-sources",
+	Short: "List all distinct project sources from sandboxes",
+	Long:  `List all distinct project sources from both local Docker containers and remote Daytona API sandboxes.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Get command flags
-		verbose, _ := cmd.Flags().GetBool("verbose")
 		showLocal, _ := cmd.Flags().GetBool("local")
 		showRemote, _ := cmd.Flags().GetBool("remote")
 		group, _ := cmd.Flags().GetString("group")
@@ -108,16 +107,24 @@ var listCmd = &cobra.Command{
 			allSandboxes = append(allSandboxes, sandboxes...)
 		}
 
-		// Display results
-		if len(allSandboxes) == 0 {
-			fmt.Println("No sandboxes found.")
-			if showLocal && showRemote {
-				fmt.Println("No local Docker containers or remote Daytona sandboxes were found.")
-			} else if showLocal {
-				fmt.Println("No local Docker containers were found.")
-			} else if showRemote {
-				fmt.Println("No remote Daytona sandboxes were found.")
+		// Extract distinct project sources
+		projectSourcesMap := make(map[string]bool)
+		for _, sb := range allSandboxes {
+			if sb.ProjectSource != "" {
+				projectSourcesMap[sb.ProjectSource] = true
 			}
+		}
+
+		// Convert to sorted slice
+		var projectSources []string
+		for projectSource := range projectSourcesMap {
+			projectSources = append(projectSources, projectSource)
+		}
+		sort.Strings(projectSources)
+
+		// Display results
+		if len(projectSources) == 0 {
+			fmt.Println("No project sources found.")
 			return
 		}
 
@@ -126,102 +133,22 @@ var listCmd = &cobra.Command{
 		defer w.Flush()
 
 		// Print header
-		if verbose {
-			fmt.Fprintln(w, "ID\tName\tType\tState\tShell Command\tProject Source\tMetadata")
-		} else {
-			fmt.Fprintln(w, "ID\tName\tType\tState\tShell Command\tProject Source")
-		}
+		fmt.Fprintln(w, "Project Source")
+		fmt.Fprintln(w, "--------------")
 
-		// Print sandboxes
-		for _, sb := range allSandboxes {
-			projectSource := sb.ProjectSource
-			if projectSource == "" {
-				projectSource = "-"
-			}
-			if verbose {
-				metadataStr := formatMetadata(sb.Metadata)
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-					truncateString(sb.ID, 36),
-					sb.Name,
-					sb.Type,
-					sb.State,
-					sb.ShellCommand,
-					truncateString(projectSource, 50),
-					metadataStr,
-				)
-			} else {
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
-					truncateString(sb.ID, 36),
-					sb.Name,
-					sb.Type,
-					sb.State,
-					sb.ShellCommand,
-					truncateString(projectSource, 50),
-				)
-			}
+		// Print project sources
+		for _, projectSource := range projectSources {
+			fmt.Fprintln(w, projectSource)
 		}
 
 		// Print summary
-		fmt.Printf("\nTotal: %d sandboxes", len(allSandboxes))
-
-		// Count by type
-		localCount := 0
-		remoteCount := 0
-		for _, sb := range allSandboxes {
-			if sb.Type == sandbox.TypeLocal {
-				localCount++
-			} else if sb.Type == sandbox.TypeRemote {
-				remoteCount++
-			}
-		}
-
-		if localCount > 0 && remoteCount > 0 {
-			fmt.Printf(" (%d local, %d remote)", localCount, remoteCount)
-		}
-		fmt.Println()
+		fmt.Printf("\nTotal: %d distinct project sources\n", len(projectSources))
 	},
-}
-
-// Helper functions
-
-func truncateString(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen-3] + "..."
-}
-
-func formatMetadata(metadata map[string]interface{}) string {
-	if len(metadata) == 0 {
-		return "-"
-	}
-
-	var parts []string
-	for key, value := range metadata {
-		// Skip large objects, just show basic info
-		switch key {
-		case "container_name", "image", "ports", "group":
-			parts = append(parts, fmt.Sprintf("%s=%v", key, value))
-		case "daytona_sandbox":
-			parts = append(parts, "daytona=yes")
-		}
-	}
-
-	if len(parts) == 0 {
-		return fmt.Sprintf("%d keys", len(metadata))
-	}
-
-	result := strings.Join(parts, ",")
-	if len(result) > 50 {
-		return result[:47] + "..."
-	}
-	return result
 }
 
 func init() {
 	// Add flags
-	listCmd.Flags().BoolP("verbose", "v", false, "Show detailed information")
-	listCmd.Flags().Bool("local", false, "Show only local Docker sandboxes")
-	listCmd.Flags().Bool("remote", false, "Show only remote Daytona sandboxes")
-	listCmd.Flags().StringP("group", "g", "", "Filter sandboxes by group")
+	projectSourcesCmd.Flags().Bool("local", false, "Show only local Docker sandboxes")
+	projectSourcesCmd.Flags().Bool("remote", false, "Show only remote Daytona sandboxes")
+	projectSourcesCmd.Flags().StringP("group", "g", "", "Filter sandboxes by group")
 }

@@ -71,7 +71,7 @@ func (x RunClaudeTaskResponse_ResponseType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RunClaudeTaskResponse_ResponseType.Descriptor instead.
 func (RunClaudeTaskResponse_ResponseType) EnumDescriptor() ([]byte, []int) {
-	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{11, 0}
+	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{13, 0}
 }
 
 // Sandbox service messages
@@ -715,6 +715,118 @@ func (x *WaitForSandboxResponse) GetError() *ErrorResponse {
 	return nil
 }
 
+type GetProjectSourcesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ShowLocal     bool                   `protobuf:"varint,1,opt,name=show_local,json=showLocal,proto3" json:"show_local,omitempty"`
+	ShowRemote    bool                   `protobuf:"varint,2,opt,name=show_remote,json=showRemote,proto3" json:"show_remote,omitempty"`
+	Group         string                 `protobuf:"bytes,3,opt,name=group,proto3" json:"group,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetProjectSourcesRequest) Reset() {
+	*x = GetProjectSourcesRequest{}
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProjectSourcesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProjectSourcesRequest) ProtoMessage() {}
+
+func (x *GetProjectSourcesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProjectSourcesRequest.ProtoReflect.Descriptor instead.
+func (*GetProjectSourcesRequest) Descriptor() ([]byte, []int) {
+	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetProjectSourcesRequest) GetShowLocal() bool {
+	if x != nil {
+		return x.ShowLocal
+	}
+	return false
+}
+
+func (x *GetProjectSourcesRequest) GetShowRemote() bool {
+	if x != nil {
+		return x.ShowRemote
+	}
+	return false
+}
+
+func (x *GetProjectSourcesRequest) GetGroup() string {
+	if x != nil {
+		return x.Group
+	}
+	return ""
+}
+
+type GetProjectSourcesResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ProjectSources []string               `protobuf:"bytes,1,rep,name=project_sources,json=projectSources,proto3" json:"project_sources,omitempty"`
+	Error          *ErrorResponse         `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *GetProjectSourcesResponse) Reset() {
+	*x = GetProjectSourcesResponse{}
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProjectSourcesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProjectSourcesResponse) ProtoMessage() {}
+
+func (x *GetProjectSourcesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProjectSourcesResponse.ProtoReflect.Descriptor instead.
+func (*GetProjectSourcesResponse) Descriptor() ([]byte, []int) {
+	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GetProjectSourcesResponse) GetProjectSources() []string {
+	if x != nil {
+		return x.ProjectSources
+	}
+	return nil
+}
+
+func (x *GetProjectSourcesResponse) GetError() *ErrorResponse {
+	if x != nil {
+		return x.Error
+	}
+	return nil
+}
+
 // Claude service messages
 type RunClaudeTaskRequest struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
@@ -727,7 +839,7 @@ type RunClaudeTaskRequest struct {
 
 func (x *RunClaudeTaskRequest) Reset() {
 	*x = RunClaudeTaskRequest{}
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[10]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -739,7 +851,7 @@ func (x *RunClaudeTaskRequest) String() string {
 func (*RunClaudeTaskRequest) ProtoMessage() {}
 
 func (x *RunClaudeTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[10]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -752,7 +864,7 @@ func (x *RunClaudeTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunClaudeTaskRequest.ProtoReflect.Descriptor instead.
 func (*RunClaudeTaskRequest) Descriptor() ([]byte, []int) {
-	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{10}
+	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *RunClaudeTaskRequest) GetSandboxIdentifier() string {
@@ -789,7 +901,7 @@ type RunClaudeTaskResponse struct {
 
 func (x *RunClaudeTaskResponse) Reset() {
 	*x = RunClaudeTaskResponse{}
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[11]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -801,7 +913,7 @@ func (x *RunClaudeTaskResponse) String() string {
 func (*RunClaudeTaskResponse) ProtoMessage() {}
 
 func (x *RunClaudeTaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[11]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -814,7 +926,7 @@ func (x *RunClaudeTaskResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunClaudeTaskResponse.ProtoReflect.Descriptor instead.
 func (*RunClaudeTaskResponse) Descriptor() ([]byte, []int) {
-	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{11}
+	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *RunClaudeTaskResponse) GetType() RunClaudeTaskResponse_ResponseType {
@@ -861,7 +973,7 @@ type GetClaudeStatusRequest struct {
 
 func (x *GetClaudeStatusRequest) Reset() {
 	*x = GetClaudeStatusRequest{}
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[12]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -873,7 +985,7 @@ func (x *GetClaudeStatusRequest) String() string {
 func (*GetClaudeStatusRequest) ProtoMessage() {}
 
 func (x *GetClaudeStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[12]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -886,7 +998,7 @@ func (x *GetClaudeStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetClaudeStatusRequest.ProtoReflect.Descriptor instead.
 func (*GetClaudeStatusRequest) Descriptor() ([]byte, []int) {
-	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{12}
+	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetClaudeStatusRequest) GetSandboxIdentifier() string {
@@ -908,7 +1020,7 @@ type GetClaudeStatusResponse struct {
 
 func (x *GetClaudeStatusResponse) Reset() {
 	*x = GetClaudeStatusResponse{}
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[13]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -920,7 +1032,7 @@ func (x *GetClaudeStatusResponse) String() string {
 func (*GetClaudeStatusResponse) ProtoMessage() {}
 
 func (x *GetClaudeStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[13]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -933,7 +1045,7 @@ func (x *GetClaudeStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetClaudeStatusResponse.ProtoReflect.Descriptor instead.
 func (*GetClaudeStatusResponse) Descriptor() ([]byte, []int) {
-	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{13}
+	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetClaudeStatusResponse) GetConnected() bool {
@@ -974,7 +1086,7 @@ type GetClaudeLogsRequest struct {
 
 func (x *GetClaudeLogsRequest) Reset() {
 	*x = GetClaudeLogsRequest{}
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[14]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -986,7 +1098,7 @@ func (x *GetClaudeLogsRequest) String() string {
 func (*GetClaudeLogsRequest) ProtoMessage() {}
 
 func (x *GetClaudeLogsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[14]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -999,7 +1111,7 @@ func (x *GetClaudeLogsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetClaudeLogsRequest.ProtoReflect.Descriptor instead.
 func (*GetClaudeLogsRequest) Descriptor() ([]byte, []int) {
-	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{14}
+	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetClaudeLogsRequest) GetSandboxIdentifier() string {
@@ -1027,7 +1139,7 @@ type GetClaudeLogsResponse struct {
 
 func (x *GetClaudeLogsResponse) Reset() {
 	*x = GetClaudeLogsResponse{}
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[15]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1039,7 +1151,7 @@ func (x *GetClaudeLogsResponse) String() string {
 func (*GetClaudeLogsResponse) ProtoMessage() {}
 
 func (x *GetClaudeLogsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[15]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1052,7 +1164,7 @@ func (x *GetClaudeLogsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetClaudeLogsResponse.ProtoReflect.Descriptor instead.
 func (*GetClaudeLogsResponse) Descriptor() ([]byte, []int) {
-	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{15}
+	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GetClaudeLogsResponse) GetSuccess() bool {
@@ -1086,7 +1198,7 @@ type GetAPIKeyRequest struct {
 
 func (x *GetAPIKeyRequest) Reset() {
 	*x = GetAPIKeyRequest{}
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[16]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1098,7 +1210,7 @@ func (x *GetAPIKeyRequest) String() string {
 func (*GetAPIKeyRequest) ProtoMessage() {}
 
 func (x *GetAPIKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[16]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1111,7 +1223,7 @@ func (x *GetAPIKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAPIKeyRequest.ProtoReflect.Descriptor instead.
 func (*GetAPIKeyRequest) Descriptor() ([]byte, []int) {
-	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{16}
+	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *GetAPIKeyRequest) GetInteractive() bool {
@@ -1131,7 +1243,7 @@ type GetAPIKeyResponse struct {
 
 func (x *GetAPIKeyResponse) Reset() {
 	*x = GetAPIKeyResponse{}
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[17]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1143,7 +1255,7 @@ func (x *GetAPIKeyResponse) String() string {
 func (*GetAPIKeyResponse) ProtoMessage() {}
 
 func (x *GetAPIKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[17]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1156,7 +1268,7 @@ func (x *GetAPIKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAPIKeyResponse.ProtoReflect.Descriptor instead.
 func (*GetAPIKeyResponse) Descriptor() ([]byte, []int) {
-	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{17}
+	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *GetAPIKeyResponse) GetApiKey() string {
@@ -1182,7 +1294,7 @@ type SetAPIKeyRequest struct {
 
 func (x *SetAPIKeyRequest) Reset() {
 	*x = SetAPIKeyRequest{}
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[18]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1194,7 +1306,7 @@ func (x *SetAPIKeyRequest) String() string {
 func (*SetAPIKeyRequest) ProtoMessage() {}
 
 func (x *SetAPIKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[18]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1207,7 +1319,7 @@ func (x *SetAPIKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetAPIKeyRequest.ProtoReflect.Descriptor instead.
 func (*SetAPIKeyRequest) Descriptor() ([]byte, []int) {
-	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{18}
+	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *SetAPIKeyRequest) GetApiKey() string {
@@ -1228,7 +1340,7 @@ type SetAPIKeyResponse struct {
 
 func (x *SetAPIKeyResponse) Reset() {
 	*x = SetAPIKeyResponse{}
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[19]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1240,7 +1352,7 @@ func (x *SetAPIKeyResponse) String() string {
 func (*SetAPIKeyResponse) ProtoMessage() {}
 
 func (x *SetAPIKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[19]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1253,7 +1365,7 @@ func (x *SetAPIKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetAPIKeyResponse.ProtoReflect.Descriptor instead.
 func (*SetAPIKeyResponse) Descriptor() ([]byte, []int) {
-	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{19}
+	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *SetAPIKeyResponse) GetSuccess() bool {
@@ -1286,7 +1398,7 @@ type ValidateAPIKeyRequest struct {
 
 func (x *ValidateAPIKeyRequest) Reset() {
 	*x = ValidateAPIKeyRequest{}
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[20]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1298,7 +1410,7 @@ func (x *ValidateAPIKeyRequest) String() string {
 func (*ValidateAPIKeyRequest) ProtoMessage() {}
 
 func (x *ValidateAPIKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[20]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1311,7 +1423,7 @@ func (x *ValidateAPIKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateAPIKeyRequest.ProtoReflect.Descriptor instead.
 func (*ValidateAPIKeyRequest) Descriptor() ([]byte, []int) {
-	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{20}
+	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ValidateAPIKeyRequest) GetApiKey() string {
@@ -1332,7 +1444,7 @@ type ValidateAPIKeyResponse struct {
 
 func (x *ValidateAPIKeyResponse) Reset() {
 	*x = ValidateAPIKeyResponse{}
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[21]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1344,7 +1456,7 @@ func (x *ValidateAPIKeyResponse) String() string {
 func (*ValidateAPIKeyResponse) ProtoMessage() {}
 
 func (x *ValidateAPIKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[21]
+	mi := &file_internal_grpc_proto_dispense_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1357,7 +1469,7 @@ func (x *ValidateAPIKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateAPIKeyResponse.ProtoReflect.Descriptor instead.
 func (*ValidateAPIKeyResponse) Descriptor() ([]byte, []int) {
-	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{21}
+	return file_internal_grpc_proto_dispense_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ValidateAPIKeyResponse) GetValid() bool {
@@ -1442,7 +1554,16 @@ const file_internal_grpc_proto_dispense_proto_rawDesc = "" +
 	"\x16WaitForSandboxResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12-\n" +
-	"\x05error\x18\x03 \x01(\v2\x17.dispense.ErrorResponseR\x05error\"\x86\x01\n" +
+	"\x05error\x18\x03 \x01(\v2\x17.dispense.ErrorResponseR\x05error\"p\n" +
+	"\x18GetProjectSourcesRequest\x12\x1d\n" +
+	"\n" +
+	"show_local\x18\x01 \x01(\bR\tshowLocal\x12\x1f\n" +
+	"\vshow_remote\x18\x02 \x01(\bR\n" +
+	"showRemote\x12\x14\n" +
+	"\x05group\x18\x03 \x01(\tR\x05group\"s\n" +
+	"\x19GetProjectSourcesResponse\x12'\n" +
+	"\x0fproject_sources\x18\x01 \x03(\tR\x0eprojectSources\x12-\n" +
+	"\x05error\x18\x02 \x01(\v2\x17.dispense.ErrorResponseR\x05error\"\x86\x01\n" +
 	"\x14RunClaudeTaskRequest\x12-\n" +
 	"\x12sandbox_identifier\x18\x01 \x01(\tR\x11sandboxIdentifier\x12)\n" +
 	"\x10task_description\x18\x02 \x01(\tR\x0ftaskDescription\x12\x14\n" +
@@ -1493,15 +1614,15 @@ const file_internal_grpc_proto_dispense_proto_rawDesc = "" +
 	"\x16ValidateAPIKeyResponse\x12\x14\n" +
 	"\x05valid\x18\x01 \x01(\bR\x05valid\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12-\n" +
-	"\x05error\x18\x03 \x01(\v2\x17.dispense.ErrorResponseR\x05error2\x88\n" +
-	"\n" +
+	"\x05error\x18\x03 \x01(\v2\x17.dispense.ErrorResponseR\x05error2\x8e\v\n" +
 	"\x0fDispenseService\x12j\n" +
 	"\rCreateSandbox\x12\x1e.dispense.CreateSandboxRequest\x1a\x1f.dispense.CreateSandboxResponse\"\x18\x82\xd3\xe4\x93\x02\x12:\x01*\"\r/v1/sandboxes\x12g\n" +
 	"\rListSandboxes\x12\x1e.dispense.ListSandboxesRequest\x1a\x1f.dispense.ListSandboxesResponse\"\x15\x82\xd3\xe4\x93\x02\x0f\x12\r/v1/sandboxes\x12t\n" +
 	"\rDeleteSandbox\x12\x1e.dispense.DeleteSandboxRequest\x1a\x1f.dispense.DeleteSandboxResponse\"\"\x82\xd3\xe4\x93\x02\x1c*\x1a/v1/sandboxes/{identifier}\x12k\n" +
 	"\n" +
 	"GetSandbox\x12\x1b.dispense.GetSandboxRequest\x1a\x1c.dispense.GetSandboxResponse\"\"\x82\xd3\xe4\x93\x02\x1c\x12\x1a/v1/sandboxes/{identifier}\x12\x7f\n" +
-	"\x0eWaitForSandbox\x12\x1f.dispense.WaitForSandboxRequest\x1a .dispense.WaitForSandboxResponse\"*\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/v1/sandboxes/{identifier}/wait\x12o\n" +
+	"\x0eWaitForSandbox\x12\x1f.dispense.WaitForSandboxRequest\x1a .dispense.WaitForSandboxResponse\"*\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/v1/sandboxes/{identifier}/wait\x12\x83\x01\n" +
+	"\x11GetProjectSources\x12\".dispense.GetProjectSourcesRequest\x1a#.dispense.GetProjectSourcesResponse\"%\x82\xd3\xe4\x93\x02\x1f\x12\x1d/v1/sandboxes/project-sources\x12o\n" +
 	"\rRunClaudeTask\x12\x1e.dispense.RunClaudeTaskRequest\x1a\x1f.dispense.RunClaudeTaskResponse\"\x1b\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/v1/claude/tasks0\x01\x12\x86\x01\n" +
 	"\x0fGetClaudeStatus\x12 .dispense.GetClaudeStatusRequest\x1a!.dispense.GetClaudeStatusResponse\".\x82\xd3\xe4\x93\x02(\x12&/v1/claude/{sandbox_identifier}/status\x12~\n" +
 	"\rGetClaudeLogs\x12\x1e.dispense.GetClaudeLogsRequest\x1a\x1f.dispense.GetClaudeLogsResponse\",\x82\xd3\xe4\x93\x02&\x12$/v1/claude/{sandbox_identifier}/logs\x12`\n" +
@@ -1522,7 +1643,7 @@ func file_internal_grpc_proto_dispense_proto_rawDescGZIP() []byte {
 }
 
 var file_internal_grpc_proto_dispense_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_internal_grpc_proto_dispense_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_internal_grpc_proto_dispense_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_internal_grpc_proto_dispense_proto_goTypes = []any{
 	(RunClaudeTaskResponse_ResponseType)(0), // 0: dispense.RunClaudeTaskResponse.ResponseType
 	(*CreateSandboxRequest)(nil),            // 1: dispense.CreateSandboxRequest
@@ -1535,67 +1656,72 @@ var file_internal_grpc_proto_dispense_proto_goTypes = []any{
 	(*GetSandboxResponse)(nil),              // 8: dispense.GetSandboxResponse
 	(*WaitForSandboxRequest)(nil),           // 9: dispense.WaitForSandboxRequest
 	(*WaitForSandboxResponse)(nil),          // 10: dispense.WaitForSandboxResponse
-	(*RunClaudeTaskRequest)(nil),            // 11: dispense.RunClaudeTaskRequest
-	(*RunClaudeTaskResponse)(nil),           // 12: dispense.RunClaudeTaskResponse
-	(*GetClaudeStatusRequest)(nil),          // 13: dispense.GetClaudeStatusRequest
-	(*GetClaudeStatusResponse)(nil),         // 14: dispense.GetClaudeStatusResponse
-	(*GetClaudeLogsRequest)(nil),            // 15: dispense.GetClaudeLogsRequest
-	(*GetClaudeLogsResponse)(nil),           // 16: dispense.GetClaudeLogsResponse
-	(*GetAPIKeyRequest)(nil),                // 17: dispense.GetAPIKeyRequest
-	(*GetAPIKeyResponse)(nil),               // 18: dispense.GetAPIKeyResponse
-	(*SetAPIKeyRequest)(nil),                // 19: dispense.SetAPIKeyRequest
-	(*SetAPIKeyResponse)(nil),               // 20: dispense.SetAPIKeyResponse
-	(*ValidateAPIKeyRequest)(nil),           // 21: dispense.ValidateAPIKeyRequest
-	(*ValidateAPIKeyResponse)(nil),          // 22: dispense.ValidateAPIKeyResponse
-	(*ResourceAllocation)(nil),              // 23: dispense.ResourceAllocation
-	(*TaskData)(nil),                        // 24: dispense.TaskData
-	(*SandboxInfo)(nil),                     // 25: dispense.SandboxInfo
-	(*ErrorResponse)(nil),                   // 26: dispense.ErrorResponse
+	(*GetProjectSourcesRequest)(nil),        // 11: dispense.GetProjectSourcesRequest
+	(*GetProjectSourcesResponse)(nil),       // 12: dispense.GetProjectSourcesResponse
+	(*RunClaudeTaskRequest)(nil),            // 13: dispense.RunClaudeTaskRequest
+	(*RunClaudeTaskResponse)(nil),           // 14: dispense.RunClaudeTaskResponse
+	(*GetClaudeStatusRequest)(nil),          // 15: dispense.GetClaudeStatusRequest
+	(*GetClaudeStatusResponse)(nil),         // 16: dispense.GetClaudeStatusResponse
+	(*GetClaudeLogsRequest)(nil),            // 17: dispense.GetClaudeLogsRequest
+	(*GetClaudeLogsResponse)(nil),           // 18: dispense.GetClaudeLogsResponse
+	(*GetAPIKeyRequest)(nil),                // 19: dispense.GetAPIKeyRequest
+	(*GetAPIKeyResponse)(nil),               // 20: dispense.GetAPIKeyResponse
+	(*SetAPIKeyRequest)(nil),                // 21: dispense.SetAPIKeyRequest
+	(*SetAPIKeyResponse)(nil),               // 22: dispense.SetAPIKeyResponse
+	(*ValidateAPIKeyRequest)(nil),           // 23: dispense.ValidateAPIKeyRequest
+	(*ValidateAPIKeyResponse)(nil),          // 24: dispense.ValidateAPIKeyResponse
+	(*ResourceAllocation)(nil),              // 25: dispense.ResourceAllocation
+	(*TaskData)(nil),                        // 26: dispense.TaskData
+	(*SandboxInfo)(nil),                     // 27: dispense.SandboxInfo
+	(*ErrorResponse)(nil),                   // 28: dispense.ErrorResponse
 }
 var file_internal_grpc_proto_dispense_proto_depIdxs = []int32{
-	23, // 0: dispense.CreateSandboxRequest.resources:type_name -> dispense.ResourceAllocation
-	24, // 1: dispense.CreateSandboxRequest.task_data:type_name -> dispense.TaskData
-	25, // 2: dispense.CreateSandboxResponse.sandbox:type_name -> dispense.SandboxInfo
-	26, // 3: dispense.CreateSandboxResponse.error:type_name -> dispense.ErrorResponse
-	25, // 4: dispense.ListSandboxesResponse.sandboxes:type_name -> dispense.SandboxInfo
-	26, // 5: dispense.ListSandboxesResponse.error:type_name -> dispense.ErrorResponse
-	26, // 6: dispense.DeleteSandboxResponse.error:type_name -> dispense.ErrorResponse
-	25, // 7: dispense.GetSandboxResponse.sandbox:type_name -> dispense.SandboxInfo
-	26, // 8: dispense.GetSandboxResponse.error:type_name -> dispense.ErrorResponse
-	26, // 9: dispense.WaitForSandboxResponse.error:type_name -> dispense.ErrorResponse
-	0,  // 10: dispense.RunClaudeTaskResponse.type:type_name -> dispense.RunClaudeTaskResponse.ResponseType
-	26, // 11: dispense.GetClaudeStatusResponse.error:type_name -> dispense.ErrorResponse
-	26, // 12: dispense.GetClaudeLogsResponse.error:type_name -> dispense.ErrorResponse
-	26, // 13: dispense.GetAPIKeyResponse.error:type_name -> dispense.ErrorResponse
-	26, // 14: dispense.SetAPIKeyResponse.error:type_name -> dispense.ErrorResponse
-	26, // 15: dispense.ValidateAPIKeyResponse.error:type_name -> dispense.ErrorResponse
-	1,  // 16: dispense.DispenseService.CreateSandbox:input_type -> dispense.CreateSandboxRequest
-	3,  // 17: dispense.DispenseService.ListSandboxes:input_type -> dispense.ListSandboxesRequest
-	5,  // 18: dispense.DispenseService.DeleteSandbox:input_type -> dispense.DeleteSandboxRequest
-	7,  // 19: dispense.DispenseService.GetSandbox:input_type -> dispense.GetSandboxRequest
-	9,  // 20: dispense.DispenseService.WaitForSandbox:input_type -> dispense.WaitForSandboxRequest
-	11, // 21: dispense.DispenseService.RunClaudeTask:input_type -> dispense.RunClaudeTaskRequest
-	13, // 22: dispense.DispenseService.GetClaudeStatus:input_type -> dispense.GetClaudeStatusRequest
-	15, // 23: dispense.DispenseService.GetClaudeLogs:input_type -> dispense.GetClaudeLogsRequest
-	17, // 24: dispense.DispenseService.GetAPIKey:input_type -> dispense.GetAPIKeyRequest
-	19, // 25: dispense.DispenseService.SetAPIKey:input_type -> dispense.SetAPIKeyRequest
-	21, // 26: dispense.DispenseService.ValidateAPIKey:input_type -> dispense.ValidateAPIKeyRequest
-	2,  // 27: dispense.DispenseService.CreateSandbox:output_type -> dispense.CreateSandboxResponse
-	4,  // 28: dispense.DispenseService.ListSandboxes:output_type -> dispense.ListSandboxesResponse
-	6,  // 29: dispense.DispenseService.DeleteSandbox:output_type -> dispense.DeleteSandboxResponse
-	8,  // 30: dispense.DispenseService.GetSandbox:output_type -> dispense.GetSandboxResponse
-	10, // 31: dispense.DispenseService.WaitForSandbox:output_type -> dispense.WaitForSandboxResponse
-	12, // 32: dispense.DispenseService.RunClaudeTask:output_type -> dispense.RunClaudeTaskResponse
-	14, // 33: dispense.DispenseService.GetClaudeStatus:output_type -> dispense.GetClaudeStatusResponse
-	16, // 34: dispense.DispenseService.GetClaudeLogs:output_type -> dispense.GetClaudeLogsResponse
-	18, // 35: dispense.DispenseService.GetAPIKey:output_type -> dispense.GetAPIKeyResponse
-	20, // 36: dispense.DispenseService.SetAPIKey:output_type -> dispense.SetAPIKeyResponse
-	22, // 37: dispense.DispenseService.ValidateAPIKey:output_type -> dispense.ValidateAPIKeyResponse
-	27, // [27:38] is the sub-list for method output_type
-	16, // [16:27] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	25, // 0: dispense.CreateSandboxRequest.resources:type_name -> dispense.ResourceAllocation
+	26, // 1: dispense.CreateSandboxRequest.task_data:type_name -> dispense.TaskData
+	27, // 2: dispense.CreateSandboxResponse.sandbox:type_name -> dispense.SandboxInfo
+	28, // 3: dispense.CreateSandboxResponse.error:type_name -> dispense.ErrorResponse
+	27, // 4: dispense.ListSandboxesResponse.sandboxes:type_name -> dispense.SandboxInfo
+	28, // 5: dispense.ListSandboxesResponse.error:type_name -> dispense.ErrorResponse
+	28, // 6: dispense.DeleteSandboxResponse.error:type_name -> dispense.ErrorResponse
+	27, // 7: dispense.GetSandboxResponse.sandbox:type_name -> dispense.SandboxInfo
+	28, // 8: dispense.GetSandboxResponse.error:type_name -> dispense.ErrorResponse
+	28, // 9: dispense.WaitForSandboxResponse.error:type_name -> dispense.ErrorResponse
+	28, // 10: dispense.GetProjectSourcesResponse.error:type_name -> dispense.ErrorResponse
+	0,  // 11: dispense.RunClaudeTaskResponse.type:type_name -> dispense.RunClaudeTaskResponse.ResponseType
+	28, // 12: dispense.GetClaudeStatusResponse.error:type_name -> dispense.ErrorResponse
+	28, // 13: dispense.GetClaudeLogsResponse.error:type_name -> dispense.ErrorResponse
+	28, // 14: dispense.GetAPIKeyResponse.error:type_name -> dispense.ErrorResponse
+	28, // 15: dispense.SetAPIKeyResponse.error:type_name -> dispense.ErrorResponse
+	28, // 16: dispense.ValidateAPIKeyResponse.error:type_name -> dispense.ErrorResponse
+	1,  // 17: dispense.DispenseService.CreateSandbox:input_type -> dispense.CreateSandboxRequest
+	3,  // 18: dispense.DispenseService.ListSandboxes:input_type -> dispense.ListSandboxesRequest
+	5,  // 19: dispense.DispenseService.DeleteSandbox:input_type -> dispense.DeleteSandboxRequest
+	7,  // 20: dispense.DispenseService.GetSandbox:input_type -> dispense.GetSandboxRequest
+	9,  // 21: dispense.DispenseService.WaitForSandbox:input_type -> dispense.WaitForSandboxRequest
+	11, // 22: dispense.DispenseService.GetProjectSources:input_type -> dispense.GetProjectSourcesRequest
+	13, // 23: dispense.DispenseService.RunClaudeTask:input_type -> dispense.RunClaudeTaskRequest
+	15, // 24: dispense.DispenseService.GetClaudeStatus:input_type -> dispense.GetClaudeStatusRequest
+	17, // 25: dispense.DispenseService.GetClaudeLogs:input_type -> dispense.GetClaudeLogsRequest
+	19, // 26: dispense.DispenseService.GetAPIKey:input_type -> dispense.GetAPIKeyRequest
+	21, // 27: dispense.DispenseService.SetAPIKey:input_type -> dispense.SetAPIKeyRequest
+	23, // 28: dispense.DispenseService.ValidateAPIKey:input_type -> dispense.ValidateAPIKeyRequest
+	2,  // 29: dispense.DispenseService.CreateSandbox:output_type -> dispense.CreateSandboxResponse
+	4,  // 30: dispense.DispenseService.ListSandboxes:output_type -> dispense.ListSandboxesResponse
+	6,  // 31: dispense.DispenseService.DeleteSandbox:output_type -> dispense.DeleteSandboxResponse
+	8,  // 32: dispense.DispenseService.GetSandbox:output_type -> dispense.GetSandboxResponse
+	10, // 33: dispense.DispenseService.WaitForSandbox:output_type -> dispense.WaitForSandboxResponse
+	12, // 34: dispense.DispenseService.GetProjectSources:output_type -> dispense.GetProjectSourcesResponse
+	14, // 35: dispense.DispenseService.RunClaudeTask:output_type -> dispense.RunClaudeTaskResponse
+	16, // 36: dispense.DispenseService.GetClaudeStatus:output_type -> dispense.GetClaudeStatusResponse
+	18, // 37: dispense.DispenseService.GetClaudeLogs:output_type -> dispense.GetClaudeLogsResponse
+	20, // 38: dispense.DispenseService.GetAPIKey:output_type -> dispense.GetAPIKeyResponse
+	22, // 39: dispense.DispenseService.SetAPIKey:output_type -> dispense.SetAPIKeyResponse
+	24, // 40: dispense.DispenseService.ValidateAPIKey:output_type -> dispense.ValidateAPIKeyResponse
+	29, // [29:41] is the sub-list for method output_type
+	17, // [17:29] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_internal_grpc_proto_dispense_proto_init() }
@@ -1610,7 +1736,7 @@ func file_internal_grpc_proto_dispense_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_grpc_proto_dispense_proto_rawDesc), len(file_internal_grpc_proto_dispense_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   22,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

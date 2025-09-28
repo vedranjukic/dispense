@@ -8,6 +8,7 @@ import (
 type SandboxServiceInterface interface {
 	Create(req *models.SandboxCreateRequest) (*models.SandboxInfo, error)
 	List(opts *models.SandboxListOptions) ([]*models.SandboxInfo, error)
+	GetProjectSources(opts *models.SandboxListOptions) ([]string, error)
 	Delete(identifier string, opts *models.SandboxDeleteOptions) error
 	FindByName(sandboxName string) (*models.SandboxInfo, error)
 	Wait(identifier string, opts *models.SandboxWaitOptions) error

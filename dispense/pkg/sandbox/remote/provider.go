@@ -88,12 +88,13 @@ func (p *Provider) Create(opts *sandbox.CreateOptions) (*sandbox.SandboxInfo, er
 
 	// Convert to our SandboxInfo format
 	sandboxInfo := &sandbox.SandboxInfo{
-		ID:           remoteSandbox.Id,
-		Name:         slug,
-		Type:         sandbox.TypeRemote,
-		State:        p.getSandboxState(remoteSandbox),
-		ShellCommand: fmt.Sprintf("ssh %s", slug),
-		Metadata:     metadata,
+		ID:            remoteSandbox.Id,
+		Name:          slug,
+		Type:          sandbox.TypeRemote,
+		State:         p.getSandboxState(remoteSandbox),
+		ShellCommand:  fmt.Sprintf("ssh %s", slug),
+		ProjectSource: "", // Will be set by service layer
+		Metadata:      metadata,
 	}
 
 	return sandboxInfo, nil
@@ -237,11 +238,12 @@ func (p *Provider) GetInfo(id string) (*sandbox.SandboxInfo, error) {
 	}
 
 	sandboxInfo := &sandbox.SandboxInfo{
-		ID:           remoteSandbox.Id,
-		Name:         name,
-		Type:         sandbox.TypeRemote,
-		State:        p.getSandboxState(remoteSandbox),
-		ShellCommand: fmt.Sprintf("ssh %s", name),
+		ID:            remoteSandbox.Id,
+		Name:          name,
+		Type:          sandbox.TypeRemote,
+		State:         p.getSandboxState(remoteSandbox),
+		ShellCommand:  fmt.Sprintf("ssh %s", name),
+		ProjectSource: "", // Not available during listing
 		Metadata: map[string]interface{}{
 			"daytona_sandbox": remoteSandbox,
 		},

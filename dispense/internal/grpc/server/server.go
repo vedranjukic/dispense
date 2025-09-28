@@ -161,6 +161,31 @@ func (s *DispenseServer) WaitForSandbox(ctx context.Context, req *pb.WaitForSand
 	}, nil
 }
 
+// GetProjectSources gets distinct project sources from all sandboxes
+func (s *DispenseServer) GetProjectSources(ctx context.Context, req *pb.GetProjectSourcesRequest) (*pb.GetProjectSourcesResponse, error) {
+	s.Logger.Printf("GetProjectSources called")
+
+	// Convert to internal model
+	opts := &models.SandboxListOptions{
+		ShowLocal:  req.ShowLocal,
+		ShowRemote: req.ShowRemote,
+		Group:      req.Group,
+	}
+
+	// Call service
+	projectSources, err := s.ServiceContainer.SandboxService.GetProjectSources(opts)
+	if err != nil {
+		s.Logger.Printf("Failed to get project sources: %v", err)
+		return &pb.GetProjectSourcesResponse{
+			Error: s.convertError(err),
+		}, nil
+	}
+
+	return &pb.GetProjectSourcesResponse{
+		ProjectSources: projectSources,
+	}, nil
+}
+
 // RunClaudeTask runs a Claude task with streaming response
 func (s *DispenseServer) RunClaudeTask(req *pb.RunClaudeTaskRequest, stream pb.DispenseService_RunClaudeTaskServer) error {
 	s.Logger.Printf("RunClaudeTask called for sandbox: %s", req.SandboxIdentifier)
@@ -378,12 +403,13 @@ func (s *DispenseServer) convertCreateSandboxRequest(req *pb.CreateSandboxReques
 
 func (s *DispenseServer) convertSandboxInfo(sb *models.SandboxInfo) *pb.SandboxInfo {
 	pbSb := &pb.SandboxInfo{
-		Id:           sb.ID,
-		Name:         sb.Name,
-		State:        sb.State,
-		ShellCommand: sb.ShellCommand,
-		Group:        sb.Group,
-		Metadata:     make(map[string]string),
+		Id:            sb.ID,
+		Name:          sb.Name,
+		State:         sb.State,
+		ShellCommand:  sb.ShellCommand,
+		Group:         sb.Group,
+		ProjectSource: sb.ProjectSource,
+		Metadata:      make(map[string]string),
 	}
 
 	// Convert type

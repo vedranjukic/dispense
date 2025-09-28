@@ -19,17 +19,18 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	DispenseService_CreateSandbox_FullMethodName   = "/dispense.DispenseService/CreateSandbox"
-	DispenseService_ListSandboxes_FullMethodName   = "/dispense.DispenseService/ListSandboxes"
-	DispenseService_DeleteSandbox_FullMethodName   = "/dispense.DispenseService/DeleteSandbox"
-	DispenseService_GetSandbox_FullMethodName      = "/dispense.DispenseService/GetSandbox"
-	DispenseService_WaitForSandbox_FullMethodName  = "/dispense.DispenseService/WaitForSandbox"
-	DispenseService_RunClaudeTask_FullMethodName   = "/dispense.DispenseService/RunClaudeTask"
-	DispenseService_GetClaudeStatus_FullMethodName = "/dispense.DispenseService/GetClaudeStatus"
-	DispenseService_GetClaudeLogs_FullMethodName   = "/dispense.DispenseService/GetClaudeLogs"
-	DispenseService_GetAPIKey_FullMethodName       = "/dispense.DispenseService/GetAPIKey"
-	DispenseService_SetAPIKey_FullMethodName       = "/dispense.DispenseService/SetAPIKey"
-	DispenseService_ValidateAPIKey_FullMethodName  = "/dispense.DispenseService/ValidateAPIKey"
+	DispenseService_CreateSandbox_FullMethodName     = "/dispense.DispenseService/CreateSandbox"
+	DispenseService_ListSandboxes_FullMethodName     = "/dispense.DispenseService/ListSandboxes"
+	DispenseService_DeleteSandbox_FullMethodName     = "/dispense.DispenseService/DeleteSandbox"
+	DispenseService_GetSandbox_FullMethodName        = "/dispense.DispenseService/GetSandbox"
+	DispenseService_WaitForSandbox_FullMethodName    = "/dispense.DispenseService/WaitForSandbox"
+	DispenseService_GetProjectSources_FullMethodName = "/dispense.DispenseService/GetProjectSources"
+	DispenseService_RunClaudeTask_FullMethodName     = "/dispense.DispenseService/RunClaudeTask"
+	DispenseService_GetClaudeStatus_FullMethodName   = "/dispense.DispenseService/GetClaudeStatus"
+	DispenseService_GetClaudeLogs_FullMethodName     = "/dispense.DispenseService/GetClaudeLogs"
+	DispenseService_GetAPIKey_FullMethodName         = "/dispense.DispenseService/GetAPIKey"
+	DispenseService_SetAPIKey_FullMethodName         = "/dispense.DispenseService/SetAPIKey"
+	DispenseService_ValidateAPIKey_FullMethodName    = "/dispense.DispenseService/ValidateAPIKey"
 )
 
 // DispenseServiceClient is the client API for DispenseService service.
@@ -44,6 +45,7 @@ type DispenseServiceClient interface {
 	DeleteSandbox(ctx context.Context, in *DeleteSandboxRequest, opts ...grpc.CallOption) (*DeleteSandboxResponse, error)
 	GetSandbox(ctx context.Context, in *GetSandboxRequest, opts ...grpc.CallOption) (*GetSandboxResponse, error)
 	WaitForSandbox(ctx context.Context, in *WaitForSandboxRequest, opts ...grpc.CallOption) (*WaitForSandboxResponse, error)
+	GetProjectSources(ctx context.Context, in *GetProjectSourcesRequest, opts ...grpc.CallOption) (*GetProjectSourcesResponse, error)
 	// Claude operations
 	RunClaudeTask(ctx context.Context, in *RunClaudeTaskRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RunClaudeTaskResponse], error)
 	GetClaudeStatus(ctx context.Context, in *GetClaudeStatusRequest, opts ...grpc.CallOption) (*GetClaudeStatusResponse, error)
@@ -106,6 +108,16 @@ func (c *dispenseServiceClient) WaitForSandbox(ctx context.Context, in *WaitForS
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(WaitForSandboxResponse)
 	err := c.cc.Invoke(ctx, DispenseService_WaitForSandbox_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dispenseServiceClient) GetProjectSources(ctx context.Context, in *GetProjectSourcesRequest, opts ...grpc.CallOption) (*GetProjectSourcesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetProjectSourcesResponse)
+	err := c.cc.Invoke(ctx, DispenseService_GetProjectSources_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -193,6 +205,7 @@ type DispenseServiceServer interface {
 	DeleteSandbox(context.Context, *DeleteSandboxRequest) (*DeleteSandboxResponse, error)
 	GetSandbox(context.Context, *GetSandboxRequest) (*GetSandboxResponse, error)
 	WaitForSandbox(context.Context, *WaitForSandboxRequest) (*WaitForSandboxResponse, error)
+	GetProjectSources(context.Context, *GetProjectSourcesRequest) (*GetProjectSourcesResponse, error)
 	// Claude operations
 	RunClaudeTask(*RunClaudeTaskRequest, grpc.ServerStreamingServer[RunClaudeTaskResponse]) error
 	GetClaudeStatus(context.Context, *GetClaudeStatusRequest) (*GetClaudeStatusResponse, error)
@@ -225,6 +238,9 @@ func (UnimplementedDispenseServiceServer) GetSandbox(context.Context, *GetSandbo
 }
 func (UnimplementedDispenseServiceServer) WaitForSandbox(context.Context, *WaitForSandboxRequest) (*WaitForSandboxResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method WaitForSandbox not implemented")
+}
+func (UnimplementedDispenseServiceServer) GetProjectSources(context.Context, *GetProjectSourcesRequest) (*GetProjectSourcesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetProjectSources not implemented")
 }
 func (UnimplementedDispenseServiceServer) RunClaudeTask(*RunClaudeTaskRequest, grpc.ServerStreamingServer[RunClaudeTaskResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method RunClaudeTask not implemented")
@@ -351,6 +367,24 @@ func _DispenseService_WaitForSandbox_Handler(srv interface{}, ctx context.Contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DispenseServiceServer).WaitForSandbox(ctx, req.(*WaitForSandboxRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DispenseService_GetProjectSources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetProjectSourcesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DispenseServiceServer).GetProjectSources(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DispenseService_GetProjectSources_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DispenseServiceServer).GetProjectSources(ctx, req.(*GetProjectSourcesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -482,6 +516,10 @@ var DispenseService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "WaitForSandbox",
 			Handler:    _DispenseService_WaitForSandbox_Handler,
+		},
+		{
+			MethodName: "GetProjectSources",
+			Handler:    _DispenseService_GetProjectSources_Handler,
 		},
 		{
 			MethodName: "GetClaudeStatus",

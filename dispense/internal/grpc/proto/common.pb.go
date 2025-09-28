@@ -311,7 +311,8 @@ type SandboxInfo struct {
 	ShellCommand  string                 `protobuf:"bytes,5,opt,name=shell_command,json=shellCommand,proto3" json:"shell_command,omitempty"`
 	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	Group         string                 `protobuf:"bytes,7,opt,name=group,proto3" json:"group,omitempty"`
-	Metadata      map[string]string      `protobuf:"bytes,8,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	ProjectSource string                 `protobuf:"bytes,8,opt,name=project_source,json=projectSource,proto3" json:"project_source,omitempty"`
+	Metadata      map[string]string      `protobuf:"bytes,9,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -391,6 +392,13 @@ func (x *SandboxInfo) GetCreatedAt() *timestamp.Timestamp {
 func (x *SandboxInfo) GetGroup() string {
 	if x != nil {
 		return x.Group
+	}
+	return ""
+}
+
+func (x *SandboxInfo) GetProjectSource() string {
+	if x != nil {
+		return x.ProjectSource
 	}
 	return ""
 }
@@ -570,7 +578,7 @@ const file_internal_grpc_proto_common_proto_rawDesc = "" +
 	"\bTaskData\x12 \n" +
 	"\vdescription\x18\x01 \x01(\tR\vdescription\x128\n" +
 	"\fgithub_issue\x18\x02 \x01(\v2\x15.dispense.GitHubIssueR\vgithubIssue\x12/\n" +
-	"\tgithub_pr\x18\x03 \x01(\v2\x12.dispense.GitHubPRR\bgithubPr\"\xe6\x02\n" +
+	"\tgithub_pr\x18\x03 \x01(\v2\x12.dispense.GitHubPRR\bgithubPr\"\x8d\x03\n" +
 	"\vSandboxInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12)\n" +
@@ -579,8 +587,9 @@ const file_internal_grpc_proto_common_proto_rawDesc = "" +
 	"\rshell_command\x18\x05 \x01(\tR\fshellCommand\x129\n" +
 	"\n" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x14\n" +
-	"\x05group\x18\a \x01(\tR\x05group\x12?\n" +
-	"\bmetadata\x18\b \x03(\v2#.dispense.SandboxInfo.MetadataEntryR\bmetadata\x1a;\n" +
+	"\x05group\x18\a \x01(\tR\x05group\x12%\n" +
+	"\x0eproject_source\x18\b \x01(\tR\rprojectSource\x12?\n" +
+	"\bmetadata\x18\t \x03(\v2#.dispense.SandboxInfo.MetadataEntryR\bmetadata\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa3\x01\n" +

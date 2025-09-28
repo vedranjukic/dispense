@@ -37,6 +37,11 @@ service DispenseService {
       body: "*"
     };
   };
+  rpc GetProjectSources(GetProjectSourcesRequest) returns (GetProjectSourcesResponse) {
+    option (google.api.http) = {
+      get: "/v1/sandboxes/project-sources"
+    };
+  };
 
   // Claude operations
   rpc RunClaudeTask(RunClaudeTaskRequest) returns (stream RunClaudeTaskResponse) {
@@ -140,6 +145,17 @@ message WaitForSandboxResponse {
   bool success = 1;
   string message = 2;
   ErrorResponse error = 3;
+}
+
+message GetProjectSourcesRequest {
+  bool show_local = 1;
+  bool show_remote = 2;
+  string group = 3;
+}
+
+message GetProjectSourcesResponse {
+  repeated string project_sources = 1;
+  ErrorResponse error = 2;
 }
 
 // Claude service messages

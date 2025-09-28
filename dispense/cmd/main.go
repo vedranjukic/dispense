@@ -62,6 +62,7 @@ func init() {
 
 	// Add subcommands
 	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(projectSourcesCmd)
 	rootCmd.AddCommand(shellCmd)
 	rootCmd.AddCommand(sshCmd) // Alias for shell command
 	rootCmd.AddCommand(newCmd)

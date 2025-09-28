@@ -128,12 +128,13 @@ func (p *Provider) Create(opts *sandbox.CreateOptions) (*sandbox.SandboxInfo, er
 	}
 
 	sandboxInfo := &sandbox.SandboxInfo{
-		ID:           opts.BranchName, // Use user-friendly branch name as ID
-		Name:         opts.BranchName, // Use user-friendly branch name as name
-		Type:         sandbox.TypeLocal,
-		State:        containerState,
-		ShellCommand: fmt.Sprintf("docker exec -it %s /bin/bash", containerName),
-		Metadata:     metadata,
+		ID:            opts.BranchName, // Use user-friendly branch name as ID
+		Name:          opts.BranchName, // Use user-friendly branch name as name
+		Type:          sandbox.TypeLocal,
+		State:         containerState,
+		ShellCommand:  fmt.Sprintf("docker exec -it %s /bin/bash", containerName),
+		ProjectSource: "", // Will be set by service layer
+		Metadata:      metadata,
 	}
 
 	// Save to database for future reference
@@ -773,11 +774,12 @@ func (p *Provider) listDockerContainers() ([]*sandbox.SandboxInfo, error) {
 			}
 
 			sandboxInfo := &sandbox.SandboxInfo{
-				ID:           sandboxName,
-				Name:         sandboxName,
-				Type:         sandbox.TypeLocal,
-				State:        p.parseContainerStatus(status),
-				ShellCommand: fmt.Sprintf("docker exec -it %s /bin/bash", containerName),
+				ID:            sandboxName,
+				Name:          sandboxName,
+				Type:          sandbox.TypeLocal,
+				State:         p.parseContainerStatus(status),
+				ShellCommand:  fmt.Sprintf("docker exec -it %s /bin/bash", containerName),
+				ProjectSource: "", // Not available during listing
 				Metadata: map[string]interface{}{
 					"container_name": containerName,
 					"container_id":   containerID,

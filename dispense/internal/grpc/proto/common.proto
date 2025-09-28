@@ -47,7 +47,8 @@ message SandboxInfo {
   string shell_command = 5;
   google.protobuf.Timestamp created_at = 6;
   string group = 7;
-  map<string, string> metadata = 8;
+  string project_source = 8;
+  map<string, string> metadata = 9;
 }
 
 // Resource allocation for remote sandboxes

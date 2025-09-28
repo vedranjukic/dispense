@@ -64,14 +64,15 @@ type GitHubPR struct {
 
 // SandboxInfo contains information about a created or existing sandbox
 type SandboxInfo struct {
-	ID           string                 `json:"id"`
-	Name         string                 `json:"name"`
-	Type         SandboxType            `json:"type"`
-	State        string                 `json:"state"`
-	ShellCommand string                 `json:"shell_command"`
-	CreatedAt    *time.Time             `json:"created_at,omitempty"`
-	Group        string                 `json:"group,omitempty"`
-	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+	ID            string                 `json:"id"`
+	Name          string                 `json:"name"`
+	Type          SandboxType            `json:"type"`
+	State         string                 `json:"state"`
+	ShellCommand  string                 `json:"shell_command"`
+	CreatedAt     *time.Time             `json:"created_at,omitempty"`
+	Group         string                 `json:"group,omitempty"`
+	ProjectSource string                 `json:"project_source,omitempty"`
+	Metadata      map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // SandboxListOptions contains options for listing sandboxes

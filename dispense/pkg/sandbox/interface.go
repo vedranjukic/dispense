@@ -34,12 +34,13 @@ type CreateOptions struct {
 
 // SandboxInfo contains information about a created sandbox
 type SandboxInfo struct {
-	ID           string
-	Name         string
-	Type         SandboxType
-	State        string
-	ShellCommand string
-	Metadata     map[string]interface{}
+	ID            string
+	Name          string
+	Type          SandboxType
+	State         string
+	ShellCommand  string
+	ProjectSource string
+	Metadata      map[string]interface{}
 }
 
 // ExecResult contains the result of command execution

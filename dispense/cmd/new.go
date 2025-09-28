@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"cli/pkg/database"
 	"cli/pkg/sandbox"
 	"cli/pkg/sandbox/local"
 	"cli/pkg/sandbox/remote"
@@ -179,6 +180,17 @@ var newCmd = &cobra.Command{
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating sandbox: %s\n", err)
 			os.Exit(1)
+		}
+
+		// Set and persist ProjectSource for local sandboxes
+		if sandboxInfo.Type == sandbox.TypeLocal {
+			projectSource := determineProjectSource(taskData, sourceDirectory)
+			sandboxInfo.ProjectSource = projectSource
+
+			// Update the database with the ProjectSource
+			if err := updateLocalSandboxProjectSource(sandboxInfo.ID, projectSource); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to update ProjectSource in database: %v\n", err)
+			}
 		}
 
 		fmt.Printf("✅ Sandbox created successfully!\n")
@@ -942,4 +954,50 @@ func isDaemonReady(sandboxInfo *sandbox.SandboxInfo) bool {
 	// Check connection state
 	state := conn.GetState()
 	return state == connectivity.Ready || state == connectivity.Idle
+}
+
+// determineProjectSource determines the project source based on task data and source directory
+func determineProjectSource(taskData *TaskData, sourceDirectory string) string {
+	// If task data contains GitHub issue, use the GitHub repo URL
+	if taskData != nil && taskData.GitHubIssue != nil {
+		return fmt.Sprintf("https://github.com/%s/%s", taskData.GitHubIssue.Owner, taskData.GitHubIssue.Repo)
+	}
+
+	// Otherwise, use SourceDirectory
+	if sourceDirectory != "" {
+		return sourceDirectory
+	}
+
+	// Default to SourceDirectory literal
+	return "SourceDirectory"
+}
+
+// updateLocalSandboxProjectSource updates the ProjectSource field for a local sandbox in the database
+func updateLocalSandboxProjectSource(sandboxID, projectSource string) error {
+	// Import database package - we need to add this to imports
+	db, err := getDatabase()
+	if err != nil {
+		return fmt.Errorf("failed to get database instance: %w", err)
+	}
+
+	// Get the sandbox from database
+	localSandbox, err := db.GetByID(sandboxID)
+	if err != nil {
+		// Try by name if ID lookup failed
+		localSandbox, err = db.GetByName(sandboxID)
+		if err != nil {
+			return fmt.Errorf("sandbox not found in database: %w", err)
+		}
+	}
+
+	// Update the ProjectSource
+	localSandbox.ProjectSource = projectSource
+
+	// Save the updated sandbox
+	return db.Update(localSandbox)
+}
+
+// getDatabase returns a database instance
+func getDatabase() (*database.SandboxDB, error) {
+	return database.GetSandboxDB()
 }
