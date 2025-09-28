@@ -71,6 +71,7 @@ func init() {
 	rootCmd.AddCommand(mcpCmd)
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(execCmd)
+	rootCmd.AddCommand(serverCmd)
 
 	// Add flags from newCmd to rootCmd so they work without specifying "new"
 	rootCmd.Flags().BoolP("remote", "r", false, "Create remote sandbox using Daytona API (default: local Docker)")
