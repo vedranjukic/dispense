@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package dispense;
+
+option go_package = "dispense/grpc-server/proto";
+
+import "google/protobuf/timestamp.proto";
+
+// Sandbox types
+enum SandboxType {
+  SANDBOX_TYPE_UNSPECIFIED = 0;
+  SANDBOX_TYPE_LOCAL = 1;
+  SANDBOX_TYPE_REMOTE = 2;
+}
+
+// GitHub integration types
+message GitHubIssue {
+  string url = 1;
+  int32 number = 2;
+  string owner = 3;
+  string repo = 4;
+  string title = 5;
+  string body = 6;
+}
+
+message GitHubPR {
+  string url = 1;
+  int32 number = 2;
+  string owner = 3;
+  string repo = 4;
+  string title = 5;
+  string body = 6;
+}
+
+message TaskData {
+  string description = 1;
+  GitHubIssue github_issue = 2;
+  GitHubPR github_pr = 3;
+}
+
+// Sandbox information
+message SandboxInfo {
+  string id = 1;
+  string name = 2;
+  SandboxType type = 3;
+  string state = 4;
+  string shell_command = 5;
+  google.protobuf.Timestamp created_at = 6;
+  string group = 7;
+  map<string, string> metadata = 8;
+}
+
+// Resource allocation for remote sandboxes
+message ResourceAllocation {
+  string snapshot = 1;
+  string target = 2;
+  int32 cpu = 3;
+  int32 memory = 4;
+  int32 disk = 5;
+  int32 auto_stop = 6;
+}
+
+// Error response
+message ErrorResponse {
+  string code = 1;
+  string message = 2;
+  map<string, string> details = 3;
+}

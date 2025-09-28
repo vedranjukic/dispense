@@ -1,0 +1,216 @@
+syntax = "proto3";
+
+package dispense;
+
+option go_package = "cli/internal/grpc/proto";
+
+import "internal/grpc/proto/common.proto";
+import "google/api/annotations.proto";
+
+// Main Dispense service that aggregates all functionality
+service DispenseService {
+  // Sandbox management
+  rpc CreateSandbox(CreateSandboxRequest) returns (CreateSandboxResponse) {
+    option (google.api.http) = {
+      post: "/v1/sandboxes"
+      body: "*"
+    };
+  };
+  rpc ListSandboxes(ListSandboxesRequest) returns (ListSandboxesResponse) {
+    option (google.api.http) = {
+      get: "/v1/sandboxes"
+    };
+  };
+  rpc DeleteSandbox(DeleteSandboxRequest) returns (DeleteSandboxResponse) {
+    option (google.api.http) = {
+      delete: "/v1/sandboxes/{identifier}"
+    };
+  };
+  rpc GetSandbox(GetSandboxRequest) returns (GetSandboxResponse) {
+    option (google.api.http) = {
+      get: "/v1/sandboxes/{identifier}"
+    };
+  };
+  rpc WaitForSandbox(WaitForSandboxRequest) returns (WaitForSandboxResponse) {
+    option (google.api.http) = {
+      post: "/v1/sandboxes/{identifier}/wait"
+      body: "*"
+    };
+  };
+
+  // Claude operations
+  rpc RunClaudeTask(RunClaudeTaskRequest) returns (stream RunClaudeTaskResponse) {
+    option (google.api.http) = {
+      post: "/v1/claude/tasks"
+      body: "*"
+    };
+  };
+  rpc GetClaudeStatus(GetClaudeStatusRequest) returns (GetClaudeStatusResponse) {
+    option (google.api.http) = {
+      get: "/v1/claude/{sandbox_identifier}/status"
+    };
+  };
+  rpc GetClaudeLogs(GetClaudeLogsRequest) returns (GetClaudeLogsResponse) {
+    option (google.api.http) = {
+      get: "/v1/claude/{sandbox_identifier}/logs"
+    };
+  };
+
+  // Configuration management
+  rpc GetAPIKey(GetAPIKeyRequest) returns (GetAPIKeyResponse) {
+    option (google.api.http) = {
+      get: "/v1/config/api-key"
+    };
+  };
+  rpc SetAPIKey(SetAPIKeyRequest) returns (SetAPIKeyResponse) {
+    option (google.api.http) = {
+      post: "/v1/config/api-key"
+      body: "*"
+    };
+  };
+  rpc ValidateAPIKey(ValidateAPIKeyRequest) returns (ValidateAPIKeyResponse) {
+    option (google.api.http) = {
+      post: "/v1/config/api-key/validate"
+      body: "*"
+    };
+  };
+}
+
+// Sandbox service messages
+message CreateSandboxRequest {
+  string name = 1;
+  string branch_name = 2;
+  bool is_remote = 3;
+  bool force = 4;
+  bool skip_copy = 5;
+  bool skip_daemon = 6;
+  string group = 7;
+  string model = 8;
+  string task = 9;
+  ResourceAllocation resources = 10;
+  string source_directory = 11;
+  TaskData task_data = 12;
+}
+
+message CreateSandboxResponse {
+  SandboxInfo sandbox = 1;
+  ErrorResponse error = 2;
+}
+
+message ListSandboxesRequest {
+  bool show_local = 1;
+  bool show_remote = 2;
+  bool verbose = 3;
+  string group = 4;
+}
+
+message ListSandboxesResponse {
+  repeated SandboxInfo sandboxes = 1;
+  ErrorResponse error = 2;
+}
+
+message DeleteSandboxRequest {
+  string identifier = 1;
+  bool delete_all = 2;
+  bool force = 3;
+}
+
+message DeleteSandboxResponse {
+  bool success = 1;
+  string message = 2;
+  ErrorResponse error = 3;
+}
+
+message GetSandboxRequest {
+  string identifier = 1;
+}
+
+message GetSandboxResponse {
+  SandboxInfo sandbox = 1;
+  ErrorResponse error = 2;
+}
+
+message WaitForSandboxRequest {
+  string identifier = 1;
+  int32 timeout_seconds = 2;
+  string group = 3;
+}
+
+message WaitForSandboxResponse {
+  bool success = 1;
+  string message = 2;
+  ErrorResponse error = 3;
+}
+
+// Claude service messages
+message RunClaudeTaskRequest {
+  string sandbox_identifier = 1;
+  string task_description = 2;
+  string model = 3;
+}
+
+message RunClaudeTaskResponse {
+  enum ResponseType {
+    STDOUT = 0;
+    STDERR = 1;
+    STATUS = 2;
+    ERROR = 3;
+  }
+  ResponseType type = 1;
+  string content = 2;
+  int64 timestamp = 3;
+  int32 exit_code = 4;
+  bool is_finished = 5;
+}
+
+message GetClaudeStatusRequest {
+  string sandbox_identifier = 1;
+}
+
+message GetClaudeStatusResponse {
+  bool connected = 1;
+  string daemon_info = 2;
+  string work_dir = 3;
+  ErrorResponse error = 4;
+}
+
+message GetClaudeLogsRequest {
+  string sandbox_identifier = 1;
+  string task_id = 2; // optional
+}
+
+message GetClaudeLogsResponse {
+  bool success = 1;
+  repeated string logs = 2;
+  ErrorResponse error = 3;
+}
+
+// Config service messages
+message GetAPIKeyRequest {
+  bool interactive = 1; // whether to prompt if not found
+}
+
+message GetAPIKeyResponse {
+  string api_key = 1;
+  ErrorResponse error = 2;
+}
+
+message SetAPIKeyRequest {
+  string api_key = 1;
+}
+
+message SetAPIKeyResponse {
+  bool success = 1;
+  string message = 2;
+  ErrorResponse error = 3;
+}
+
+message ValidateAPIKeyRequest {
+  string api_key = 1;
+}
+
+message ValidateAPIKeyResponse {
+  bool valid = 1;
+  string message = 2;
+  ErrorResponse error = 3;
+}

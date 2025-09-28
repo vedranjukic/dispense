@@ -130,6 +130,7 @@ Sometimes it's useful to connect to a sandbox with your favorite IDE in order to
 - **🌳 GitHub Integration** - Create sandboxes directly from GitHub issues
 - **⚡ Background Tasks** - Leave tasks running while you work on other things
 - **🤖 MCP Integration** - Built-in Model Context Protocol server for AI assistant integration
+- **🌐 gRPC & REST API** - Comprehensive API with HTTP gateway for programmatic access and integration
 
 ## 🤖 MCP Integration
 
@@ -333,6 +334,82 @@ DISPENSE_LOG_LEVEL=debug dispense mcp
 - **Development Workflow** - Seamless integration with development and production environments
 - **Integration Ready** - Works with Claude Code and other MCP-compatible tools
 
+## 🌐 gRPC & REST API
+
+Dispense includes a comprehensive gRPC API with HTTP/REST gateway support, enabling programmatic access to all sandbox management, Claude operations, and configuration endpoints. This allows you to integrate Dispense into your own applications, CI/CD pipelines, or build custom frontends.
+
+### Starting the API Server
+
+```bash
+# Start both gRPC server (port 8080) and HTTP gateway (port 8081)
+dispense server
+
+# Start with authentication disabled (development mode)
+dispense server --no-auth
+
+# Start only gRPC server
+dispense server --grpc-only --grpc-port :9090
+
+# Start only HTTP REST gateway
+dispense server --http-only --http-port :8082 --grpc-endpoint localhost:9090
+
+# Start with API key authentication
+dispense server --api-key your-secret-key
+# or via environment variable
+DISPENSE_API_KEY=your-secret-key dispense server
+```
+
+### API Features
+
+- **Complete Sandbox Management** - Create, list, delete, and monitor sandboxes via API
+- **Claude Code Integration** - Run tasks, check status, and retrieve logs programmatically
+- **Configuration Management** - Get/set API keys and validate configurations
+- **Dual Protocol Support** - Native gRPC for performance or REST for web clients
+- **Authentication & Security** - API key authentication with middleware support
+- **Streaming Support** - Real-time task output via gRPC streaming
+
+### Usage Examples
+
+**REST API:**
+```bash
+# List all sandboxes
+curl -H "X-API-Key: your-key" http://localhost:8081/v1/sandboxes
+
+# Create a new sandbox
+curl -X POST -H "X-API-Key: your-key" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"api-test","task":"Test API integration"}' \
+  http://localhost:8081/v1/sandboxes
+
+# Get Claude status
+curl -H "X-API-Key: your-key" \
+  http://localhost:8081/v1/claude/api-test/status
+```
+
+**gRPC with grpcurl:**
+```bash
+# List sandboxes via gRPC
+grpcurl -H "api-key: your-key" -plaintext localhost:8080 \
+  dispense.DispenseService/ListSandboxes
+
+# Enable gRPC reflection for easy exploration
+dispense server --grpc-reflection
+grpcurl -plaintext localhost:8080 list
+```
+
+### Documentation
+
+For complete API documentation including all endpoints, message schemas, and integration examples, see:
+
+**📋 [Complete gRPC API Documentation](specs/grpc-service-spec.md)**
+
+The documentation includes:
+- Full service definition with all RPC methods
+- Request/response message schemas
+- Authentication and error handling
+- Code examples in multiple languages
+- Integration patterns and best practices
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -531,6 +608,29 @@ dispense claude my-project tasks <task-id>
 # View task logs
 dispense claude my-project logs <task-id>
 ```
+
+### API Server Mode
+
+Start the built-in gRPC and HTTP REST API servers:
+
+```bash
+# Start both gRPC and HTTP servers
+dispense server
+
+# Start with custom ports
+dispense server --grpc-port :9090 --http-port :8082
+
+# Start with authentication
+dispense server --api-key your-secret-key
+
+# Start only gRPC server
+dispense server --grpc-only
+
+# Start only HTTP gateway
+dispense server --http-only --grpc-endpoint localhost:9090
+```
+
+The API server provides programmatic access to all Dispense functionality via gRPC and REST endpoints. For complete documentation, see the [gRPC & REST API](#-grpc--rest-api) section.
 
 ### MCP Server Mode
 
