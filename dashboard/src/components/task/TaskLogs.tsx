@@ -5,7 +5,7 @@ import { formatLogType, formatTimestamp, parseLogContent } from '../../utils/for
 import { RunClaudeTaskResponseType } from '@api-client-ts';
 
 export default function TaskLogs({ sandboxId, taskId, onTaskComplete }: TaskLogsProps) {
-  const { logs, isRunning, error } = useTasks(sandboxId);
+  const { logs, isRunning, isLoading, error } = useTasks(sandboxId);
   const [autoScroll, setAutoScroll] = useState(true);
   const [filter, setFilter] = useState<RunClaudeTaskResponseType | 'all'>('all');
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -85,6 +85,12 @@ export default function TaskLogs({ sandboxId, taskId, onTaskComplete }: TaskLogs
               Running...
             </div>
           )}
+          {isLoading && (
+            <div className="flex items-center text-xs text-gray-600">
+              <div className="animate-spin w-3 h-3 border border-gray-600 border-t-transparent rounded-full mr-2"></div>
+              Loading logs...
+            </div>
+          )}
         </div>
 
         <div className="flex items-center space-x-2">
@@ -140,7 +146,12 @@ export default function TaskLogs({ sandboxId, taskId, onTaskComplete }: TaskLogs
           </div>
         )}
 
-        {filteredLogs.length === 0 ? (
+        {isLoading ? (
+          <div className="text-center text-gray-500 py-8">
+            <div className="animate-spin w-8 h-8 border-2 border-gray-300 border-t-blue-500 rounded-full mx-auto mb-4"></div>
+            <p>Loading existing task logs...</p>
+          </div>
+        ) : filteredLogs.length === 0 ? (
           <div className="text-center text-gray-500 py-8">
             {logs.length === 0 ? (
               <div>

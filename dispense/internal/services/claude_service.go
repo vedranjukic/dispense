@@ -369,6 +369,87 @@ func (s *ClaudeService) loadAppSpecificClaudeAPIKey() (string, error) {
 	return apiKey, nil
 }
 
+// ListTasks retrieves all tasks for the specified sandbox
+func (s *ClaudeService) ListTasks(req *models.ClaudeTaskListRequest) (*models.ClaudeTaskListResponse, error) {
+	// Find the sandbox
+	sandboxInfo, err := s.sandboxService.FindByName(req.SandboxIdentifier)
+	if err != nil {
+		return &models.ClaudeTaskListResponse{
+			Success:  false,
+			ErrorMsg: err.Error(),
+		}, nil
+	}
+
+	// Get daemon connection info
+	daemonAddr, err := s.getDaemonAddress(sandboxInfo)
+	if err != nil {
+		return &models.ClaudeTaskListResponse{
+			Success:  false,
+			ErrorMsg: "Failed to get daemon address: " + err.Error(),
+		}, nil
+	}
+
+	// Connect to daemon
+	conn, err := s.connectToDaemon(daemonAddr)
+	if err != nil {
+		return &models.ClaudeTaskListResponse{
+			Success:  false,
+			ErrorMsg: "Failed to connect to daemon: " + err.Error(),
+		}, nil
+	}
+	defer conn.Close()
+
+	// Create client and list tasks
+	client := pb.NewAgentServiceClient(conn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	grpcReq := &pb.ListTasksRequest{}
+
+	resp, err := client.ListTasks(ctx, grpcReq)
+	if err != nil {
+		return &models.ClaudeTaskListResponse{
+			Success:  false,
+			ErrorMsg: "Failed to list tasks: " + err.Error(),
+		}, nil
+	}
+
+	// Convert daemon task info to our model
+	var tasks []models.ClaudeTaskInfo
+	for _, task := range resp.Tasks {
+		var state string
+		switch task.State {
+		case pb.TaskStatusResponse_PENDING:
+			state = "PENDING"
+		case pb.TaskStatusResponse_RUNNING:
+			state = "RUNNING"
+		case pb.TaskStatusResponse_COMPLETED:
+			state = "COMPLETED"
+		case pb.TaskStatusResponse_FAILED:
+			state = "FAILED"
+		default:
+			state = "UNKNOWN"
+		}
+
+		tasks = append(tasks, models.ClaudeTaskInfo{
+			TaskID:     task.TaskId,
+			Prompt:     task.Prompt,
+			State:      state,
+			StartedAt:  task.StartedAt,
+			FinishedAt: task.FinishedAt,
+			ExitCode:   task.ExitCode,
+			Error:      task.Error,
+			WorkDir:    task.WorkingDirectory,
+		})
+	}
+
+	return &models.ClaudeTaskListResponse{
+		Success: true,
+		Tasks:   tasks,
+	}, nil
+}
+
 // retrieveLogsFromSandbox retrieves logs from the specified sandbox
 func (s *ClaudeService) retrieveLogsFromSandbox(sandboxInfo *models.SandboxInfo, taskID string) ([]string, error) {
 	logDir := "/home/daytona/.dispense/logs"

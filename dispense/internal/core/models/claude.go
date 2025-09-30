@@ -59,3 +59,27 @@ type ClaudeTaskStatusResponse struct {
 	WorkDir      string `json:"work_dir"`
 	ErrorMsg     string `json:"error,omitempty"`
 }
+
+// ClaudeTaskListRequest represents a request to list Claude tasks
+type ClaudeTaskListRequest struct {
+	SandboxIdentifier string
+}
+
+// ClaudeTaskInfo represents information about a Claude task
+type ClaudeTaskInfo struct {
+	TaskID      string `json:"task_id"`
+	Prompt      string `json:"prompt"`
+	State       string `json:"state"`
+	StartedAt   int64  `json:"started_at"`
+	FinishedAt  int64  `json:"finished_at"`
+	ExitCode    int32  `json:"exit_code"`
+	Error       string `json:"error"`
+	WorkDir     string `json:"work_dir"`
+}
+
+// ClaudeTaskListResponse represents the response from listing Claude tasks
+type ClaudeTaskListResponse struct {
+	Success  bool              `json:"success"`
+	Tasks    []ClaudeTaskInfo  `json:"tasks"`
+	ErrorMsg string            `json:"error,omitempty"`
+}

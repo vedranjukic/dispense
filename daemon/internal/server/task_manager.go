@@ -120,9 +120,8 @@ func (tm *TaskManager) StartClaudeTask(prompt, workingDir, apiKey, model string,
 			tm.completeTask(taskID)
 			cancel() // Cancel context to signal completion
 		}()
-
 		// Prepare Claude command for synchronous execution
-		cmd := exec.CommandContext(ctx, "claude", "--dangerously-skip-permissions", prompt)
+		cmd := exec.CommandContext(ctx, "claude", "--dangerously-skip-permissions", "--print", "--output-format=stream-json", "--include-partial-messages", "--verbose", prompt)
 		cmd.Dir = workingDir
 
 		// Set environment variables
@@ -148,55 +147,107 @@ func (tm *TaskManager) StartClaudeTask(prompt, workingDir, apiKey, model string,
 			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, value))
 		}
 
-		// Execute and capture output
-		output, err := cmd.CombinedOutput()
+		// Get stdout and stderr pipes
+		stdoutPipe, err := cmd.StdoutPipe()
+		if err != nil {
+			log.Printf("Task %s [ERROR]: Failed to create stdout pipe: %v", taskID, err)
+			errorMsg := fmt.Sprintf("Failed to create stdout pipe: %v", err)
+			tm.markTaskFailed(taskID, &errorMsg, 1)
+			return
+		}
+
+		stderrPipe, err := cmd.StderrPipe()
+		if err != nil {
+			log.Printf("Task %s [ERROR]: Failed to create stderr pipe: %v", taskID, err)
+			errorMsg := fmt.Sprintf("Failed to create stderr pipe: %v", err)
+			tm.markTaskFailed(taskID, &errorMsg, 1)
+			return
+		}
+
+		// Store pipes in task for potential cleanup
+		tm.mutex.Lock()
+		if task, exists := tm.tasks[taskID]; exists {
+			task.Process = cmd
+			task.StdoutPipe = stdoutPipe
+			task.StderrPipe = stderrPipe
+		}
+		tm.mutex.Unlock()
+
+		// Start the command
+		if err := cmd.Start(); err != nil {
+			log.Printf("Task %s [ERROR]: Failed to start command: %v", taskID, err)
+			errorMsg := fmt.Sprintf("Failed to start command: %v", err)
+			tm.markTaskFailed(taskID, &errorMsg, 1)
+			return
+		}
+
+		log.Printf("Task %s started with PID: %d", taskID, cmd.Process.Pid)
+
+		// Start goroutines to stream stdout and stderr
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		// Stream stdout
+		go func() {
+			defer wg.Done()
+			tm.streamOutput(taskID, stdoutPipe, "STDOUT")
+		}()
+
+		// Stream stderr
+		go func() {
+			defer wg.Done()
+			tm.streamOutput(taskID, stderrPipe, "STDERR")
+		}()
+
+		// Wait for streaming to complete
+		wg.Wait()
+
+		// Wait for the process to finish
+		err = cmd.Wait()
 		timestamp := time.Now().Format(time.RFC3339)
 
-		if err != nil {
-			// Log error
-			logEntry := fmt.Sprintf("[%s] [ERROR] Claude execution failed: %v\n", timestamp, err)
-			logFile.WriteString(logEntry)
-			log.Printf("Task %s [ERROR]: Claude execution failed: %v", taskID, err)
+		tm.mutex.Lock()
+		if task, exists := tm.tasks[taskID]; exists {
+			finishedAt := time.Now()
+			task.FinishedAt = &finishedAt
 
-			errorMsg := err.Error()
-
-			// Mark task as failed
-			tm.mutex.Lock()
-			if task, exists := tm.tasks[taskID]; exists {
-				task.State = proto.TaskStatusResponse_FAILED
-				exitCode := int32(1)
+			if err != nil {
+				// Process failed
+				var exitCode int32 = 1
+				if exitError, ok := err.(*exec.ExitError); ok {
+					exitCode = int32(exitError.ExitCode())
+				}
 				task.ExitCode = &exitCode
+				task.State = proto.TaskStatusResponse_FAILED
+				errorMsg := err.Error()
 				task.Error = &errorMsg
-				finishedAt := time.Now()
-				task.FinishedAt = &finishedAt
-			}
-			tm.mutex.Unlock()
-		} else {
-			// Log successful output
-			outputStr := string(output)
-			if outputStr != "" {
-				logEntry := fmt.Sprintf("[%s] [STDOUT] %s\n", timestamp, outputStr)
-				logFile.WriteString(logEntry)
-				log.Printf("Task %s [STDOUT]: %s", taskID, outputStr)
-			}
 
-			// Mark task as completed
-			tm.mutex.Lock()
-			if task, exists := tm.tasks[taskID]; exists {
-				task.State = proto.TaskStatusResponse_COMPLETED
+				logEntry := fmt.Sprintf("[%s] [ERROR] Claude execution failed: %v\n", timestamp, err)
+				logFile.WriteString(logEntry)
+				log.Printf("Task %s [ERROR]: Claude execution failed: %v", taskID, err)
+			} else {
+				// Process succeeded
 				exitCode := int32(0)
 				task.ExitCode = &exitCode
-				finishedAt := time.Now()
-				task.FinishedAt = &finishedAt
+				task.State = proto.TaskStatusResponse_COMPLETED
+
+				logEntry := fmt.Sprintf("[%s] [STATUS] Task completed successfully\n", timestamp)
+				logFile.WriteString(logEntry)
+				log.Printf("Task %s completed successfully", taskID)
 			}
-			tm.mutex.Unlock()
 		}
+		tm.mutex.Unlock()
 
 		// Log completion
 		completionEntry := fmt.Sprintf("[%s] [STATUS] Task completed with exit code %d\n",
-			time.Now().Format(time.RFC3339),
+			timestamp,
 			func() int32 {
-				if err != nil { return 1 }
+				if err != nil {
+					if exitError, ok := err.(*exec.ExitError); ok {
+						return int32(exitError.ExitCode())
+					}
+					return 1
+				}
 				return 0
 			}())
 		logFile.WriteString(completionEntry)
@@ -227,9 +278,19 @@ func (tm *TaskManager) completeTask(taskID string) {
 	log.Printf("Task %s completed", taskID)
 }
 
-// logOutput logs output from Claude process to file (kept for compatibility but not used in simplified version)
-func (tm *TaskManager) logOutput(task *Task, pipe io.ReadCloser, streamType string) {
+// streamOutput streams output from a pipe to the log file in real-time
+func (tm *TaskManager) streamOutput(taskID string, pipe io.ReadCloser, streamType string) {
 	defer pipe.Close()
+
+	// Get the task and log file
+	tm.mutex.RLock()
+	task, exists := tm.tasks[taskID]
+	tm.mutex.RUnlock()
+
+	if !exists {
+		log.Printf("Task %s not found during output streaming", taskID)
+		return
+	}
 
 	scanner := bufio.NewScanner(pipe)
 	for scanner.Scan() {
@@ -239,61 +300,44 @@ func (tm *TaskManager) logOutput(task *Task, pipe io.ReadCloser, streamType stri
 		// Write to log file
 		logEntry := fmt.Sprintf("[%s] [%s] %s\n", timestamp, streamType, line)
 		task.LogFile.WriteString(logEntry)
-		task.LogFile.Sync() // Ensure data is written to disk
+		task.LogFile.Sync() // Ensure data is written to disk immediately
 
 		// Log to daemon logs as well
-		log.Printf("Task %s [%s]: %s", task.ID, streamType, line)
+		log.Printf("Task %s [%s]: %s", taskID, streamType, line)
 	}
 
 	if err := scanner.Err(); err != nil {
-		log.Printf("Error reading %s for task %s: %v", streamType, task.ID, err)
+		log.Printf("Error reading %s for task %s: %v", streamType, taskID, err)
+		// Log the error to the file as well
+		timestamp := time.Now().Format(time.RFC3339)
+		errorEntry := fmt.Sprintf("[%s] [ERROR] Error reading %s: %v\n", timestamp, streamType, err)
+		task.LogFile.WriteString(errorEntry)
+		task.LogFile.Sync()
 	}
 }
 
-// monitorProcess monitors the Claude process completion
-func (tm *TaskManager) monitorProcess(task *Task) {
-	// Wait for process to complete
-	err := task.Process.Wait()
-
+// markTaskFailed marks a task as failed with the given error message and exit code
+func (tm *TaskManager) markTaskFailed(taskID string, errorMsg *string, exitCode int32) {
 	tm.mutex.Lock()
 	defer tm.mutex.Unlock()
 
-	// Update task state
-	now := time.Now()
-	task.FinishedAt = &now
-
-	if err != nil {
-		if exitError, ok := err.(*exec.ExitError); ok {
-			exitCode := int32(exitError.ExitCode())
-			task.ExitCode = &exitCode
-			task.State = proto.TaskStatusResponse_FAILED
-		} else {
-			// Process was likely killed or failed to start
-			exitCode := int32(-1)
-			task.ExitCode = &exitCode
-			task.State = proto.TaskStatusResponse_FAILED
-		}
-	} else {
-		exitCode := int32(0)
+	if task, exists := tm.tasks[taskID]; exists {
+		task.State = proto.TaskStatusResponse_FAILED
 		task.ExitCode = &exitCode
-		task.State = proto.TaskStatusResponse_COMPLETED
+		task.Error = errorMsg
+		finishedAt := time.Now()
+		task.FinishedAt = &finishedAt
+
+		// Log to file if available
+		if task.LogFile != nil {
+			timestamp := time.Now().Format(time.RFC3339)
+			logEntry := fmt.Sprintf("[%s] [ERROR] %s\n", timestamp, *errorMsg)
+			task.LogFile.WriteString(logEntry)
+			task.LogFile.Sync()
+		}
 	}
-
-	// Close log file
-	task.LogFile.Close()
-
-	// Write completion message to log file
-	logEntry := fmt.Sprintf("[%s] [STATUS] Task completed with exit code %d\n",
-		time.Now().Format(time.RFC3339), *task.ExitCode)
-
-	// Reopen file in append mode to write completion message
-	if logFile, err := os.OpenFile(task.LogFile.Name(), os.O_APPEND|os.O_WRONLY, 0644); err == nil {
-		logFile.WriteString(logEntry)
-		logFile.Close()
-	}
-
-	log.Printf("Task %s completed with exit code %d", task.ID, *task.ExitCode)
 }
+
 
 // GetTaskStatus returns the current status of a task
 func (tm *TaskManager) GetTaskStatus(taskID string) (*proto.TaskStatusResponse, error) {
@@ -473,38 +517,6 @@ func (tm *TaskManager) StreamTaskOutput(taskID string, stream proto.AgentService
 	}
 }
 
-// streamAndLogPipe streams output from a pipe to gRPC stream and logs to file
-func (tm *TaskManager) streamAndLogPipe(task *Task, pipe io.ReadCloser, responseType proto.ExecuteClaudeResponse_ResponseType, streamType string, stream proto.AgentService_ExecuteClaudeServer) {
-	defer pipe.Close()
-
-	scanner := bufio.NewScanner(pipe)
-	for scanner.Scan() {
-		line := scanner.Text()
-		timestamp := time.Now()
-
-		// Write to log file
-		logEntry := fmt.Sprintf("[%s] [%s] %s\n", timestamp.Format(time.RFC3339), streamType, line)
-		task.LogFile.WriteString(logEntry)
-		task.LogFile.Sync() // Ensure data is written to disk
-
-		// Log to daemon logs as well
-		log.Printf("Task %s [%s]: %s", task.ID, streamType, line)
-
-		// Send to gRPC stream
-		if err := stream.Send(&proto.ExecuteClaudeResponse{
-			Type:      responseType,
-			Content:   line,
-			Timestamp: timestamp.Unix(),
-		}); err != nil {
-			log.Printf("Error sending stream data: %v", err)
-			return
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		log.Printf("Error reading %s for task %s: %v", streamType, task.ID, err)
-	}
-}
 
 // StopTask stops a running task
 func (tm *TaskManager) StopTask(taskID string) error {
@@ -517,8 +529,39 @@ func (tm *TaskManager) StopTask(taskID string) error {
 	}
 
 	if task.State == proto.TaskStatusResponse_RUNNING {
-		task.cancel() // Cancel context to stop the process
+		// Cancel context to stop the process
+		task.cancel()
+
+		// If we have a process, try to kill it gracefully
+		if task.Process != nil && task.Process.Process != nil {
+			if err := task.Process.Process.Kill(); err != nil {
+				log.Printf("Error killing process for task %s: %v", taskID, err)
+			}
+		}
+
+		// Close pipes if they exist
+		if task.StdoutPipe != nil {
+			task.StdoutPipe.Close()
+		}
+		if task.StderrPipe != nil {
+			task.StderrPipe.Close()
+		}
+
 		task.State = proto.TaskStatusResponse_FAILED
+		finishedAt := time.Now()
+		task.FinishedAt = &finishedAt
+		exitCode := int32(-1) // Indicate terminated
+		task.ExitCode = &exitCode
+		errorMsg := "Task was stopped by user"
+		task.Error = &errorMsg
+
+		// Log termination
+		if task.LogFile != nil {
+			timestamp := time.Now().Format(time.RFC3339)
+			logEntry := fmt.Sprintf("[%s] [STATUS] Task stopped by user\n", timestamp)
+			task.LogFile.WriteString(logEntry)
+			task.LogFile.Sync()
+		}
 
 		log.Printf("Stopped task %s", taskID)
 	}

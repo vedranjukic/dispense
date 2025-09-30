@@ -60,6 +60,11 @@ service DispenseService {
       get: "/v1/claude/{sandbox_identifier}/logs"
     };
   };
+  rpc ListClaudeTasks(ListClaudeTasksRequest) returns (ListClaudeTasksResponse) {
+    option (google.api.http) = {
+      get: "/v1/claude/{sandbox_identifier}/tasks"
+    };
+  };
 
   // Configuration management
   rpc GetAPIKey(GetAPIKeyRequest) returns (GetAPIKeyResponse) {
@@ -198,6 +203,27 @@ message GetClaudeLogsRequest {
 message GetClaudeLogsResponse {
   bool success = 1;
   repeated string logs = 2;
+  ErrorResponse error = 3;
+}
+
+message ListClaudeTasksRequest {
+  string sandbox_identifier = 1;
+}
+
+message TaskInfo {
+  string task_id = 1;
+  string prompt = 2;
+  string state = 3;  // PENDING, RUNNING, COMPLETED, FAILED
+  int64 started_at = 4;
+  int64 finished_at = 5;
+  int32 exit_code = 6;
+  string error = 7;
+  string working_directory = 8;
+}
+
+message ListClaudeTasksResponse {
+  bool success = 1;
+  repeated TaskInfo tasks = 2;
   ErrorResponse error = 3;
 }
 

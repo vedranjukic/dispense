@@ -100,6 +100,18 @@ export class DashboardAPIService {
     return response;
   }
 
+  async listClaudeTasks(sandboxId: string) {
+    // For now, use the existing getClaudeLogs without taskId to get recent tasks
+    // This will be replaced with proper ListClaudeTasks endpoint when available
+    const response = await this.client.getClaudeLogs(sandboxId);
+
+    if (response.error) {
+      throw new Error(`${response.error.code}: ${response.error.message}`);
+    }
+
+    return response;
+  }
+
   // File operations (placeholder for future API endpoints)
   async getModifiedFiles(sandboxId: string): Promise<FileItem[]> {
     // This would need to be implemented when the API supports file listing
