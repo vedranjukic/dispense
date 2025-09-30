@@ -27,7 +27,6 @@ var dbListCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "Error opening database: %s\n", err)
 			os.Exit(1)
 		}
-		defer db.Close()
 
 		sandboxes, err := db.List()
 		if err != nil {
@@ -77,7 +76,6 @@ var dbDeleteCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "Error opening database: %s\n", err)
 			os.Exit(1)
 		}
-		defer db.Close()
 
 		// Try to delete by ID first
 		err = db.Delete(identifier)
@@ -112,7 +110,6 @@ var dbAddCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "Error opening database: %s\n", err)
 			os.Exit(1)
 		}
-		defer db.Close()
 
 		// Create sandbox record
 		sandbox := &database.LocalSandbox{
@@ -163,7 +160,6 @@ var dbInfoCmd = &cobra.Command{
 			if err != nil {
 				fmt.Printf("Database status: Error opening (%s)\n", err)
 			} else {
-				defer db.Close()
 				sandboxes, err := db.List()
 				if err != nil {
 					fmt.Printf("Database status: Error reading (%s)\n", err)

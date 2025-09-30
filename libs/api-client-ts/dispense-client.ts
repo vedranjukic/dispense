@@ -217,7 +217,7 @@ export class DispenseClient {
   private timeout: number;
 
   constructor(config: DispenseClientConfig = {}) {
-    this.baseUrl = config.baseUrl || 'http://localhost:8081';
+    this.baseUrl = (config.baseUrl || window.location.origin) + '/api';
     this.apiKey = config.apiKey;
     this.timeout = config.timeout || 30000;
   }
@@ -294,13 +294,11 @@ export class DispenseClient {
     show_local?: boolean;
     show_remote?: boolean;
     verbose?: boolean;
-    group?: string;
   }): Promise<ListSandboxesResponse> {
     const searchParams = new URLSearchParams();
     if (params?.show_local !== undefined) searchParams.set('show_local', params.show_local.toString());
     if (params?.show_remote !== undefined) searchParams.set('show_remote', params.show_remote.toString());
     if (params?.verbose !== undefined) searchParams.set('verbose', params.verbose.toString());
-    if (params?.group) searchParams.set('group', params.group);
 
     const query = searchParams.toString();
     return this.request<ListSandboxesResponse>('GET', `/v1/sandboxes${query ? '?' + query : ''}`);

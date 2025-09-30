@@ -14,7 +14,9 @@
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
-    "paths": {}
+    "paths": {
+      "@api-client-ts": ["libs/api-client-ts/dispense-client.ts"]
+    }
   },
   "exclude": ["node_modules", "tmp"]
 }

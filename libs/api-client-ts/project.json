@@ -1,0 +1,19 @@
+{
+  "name": "api-client-ts",
+  "sourceRoot": "libs/api-client-ts",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "nx:noop",
+      "options": {}
+    },
+    "lint": {
+      "executor": "@nx/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/api-client-ts/**/*.{ts,js}"]
+      }
+    }
+  },
+  "tags": ["type:util", "scope:shared"]
+}

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"syscall"
 
 	"cli/pkg/sandbox"
 
@@ -32,118 +33,135 @@ type LocalSandbox struct {
 
 // SandboxDB provides database operations for local sandboxes
 type SandboxDB struct {
-	db *storm.DB
+	dbPath string
 }
 
 var (
-	sandboxDBInstance *SandboxDB
-	sandboxDBMutex    sync.RWMutex
-	initError         error
+	dbPathOnce sync.Once
+	dbPath     string
+	dbPathErr  error
 )
 
-// NewSandboxDB creates a new sandbox database instance using singleton pattern
+// NewSandboxDB creates a new sandbox database instance
 func NewSandboxDB() (*SandboxDB, error) {
-	sandboxDBMutex.Lock()
-	defer sandboxDBMutex.Unlock()
-
-	// Return existing instance if already initialized
-	if sandboxDBInstance != nil {
-		return sandboxDBInstance, nil
-	}
-
-	// Return previous initialization error if any
-	if initError != nil {
-		return nil, initError
-	}
-
-	// Create database directory in user's home directory
-	homeDir, err := os.UserHomeDir()
+	path, err := getDBPath()
 	if err != nil {
-		initError = fmt.Errorf("failed to get user home directory: %w", err)
-		return nil, initError
+		return nil, err
 	}
+	return &SandboxDB{dbPath: path}, nil
+}
 
-	dbDir := filepath.Join(homeDir, ".dispense")
-	if err := os.MkdirAll(dbDir, 0755); err != nil {
-		initError = fmt.Errorf("failed to create database directory: %w", err)
-		return nil, initError
-	}
+// GetSandboxDB creates a new sandbox database instance
+func GetSandboxDB() (*SandboxDB, error) {
+	return NewSandboxDB()
+}
 
-	dbPath := filepath.Join(dbDir, "sandboxes.db")
+// getDBPath returns the database file path, initializing it once
+func getDBPath() (string, error) {
+	dbPathOnce.Do(func() {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			dbPathErr = fmt.Errorf("failed to get user home directory: %w", err)
+			return
+		}
 
-	// Try to open the database with retry logic for timeout issues
-	var db *storm.DB
+		dbDir := filepath.Join(homeDir, ".dispense")
+		if err := os.MkdirAll(dbDir, 0755); err != nil {
+			dbPathErr = fmt.Errorf("failed to create database directory: %w", err)
+			return
+		}
+
+		dbPath = filepath.Join(dbDir, "sandboxes.db")
+	})
+
+	return dbPath, dbPathErr
+}
+
+// openDB opens a database connection with retry logic
+func (sdb *SandboxDB) openDB() (*storm.DB, error) {
 	maxRetries := 3
+	baseDelay := 50 * time.Millisecond
+
 	for i := 0; i < maxRetries; i++ {
-		db, err = storm.Open(dbPath)
+		db, err := storm.Open(sdb.dbPath)
 		if err == nil {
-			break
+			return db, nil
 		}
 
 		// Check if it's a timeout or lock error
 		errStr := strings.ToLower(err.Error())
 		if strings.Contains(errStr, "timeout") || strings.Contains(errStr, "locked") {
-			// If this isn't the last attempt, wait a bit and try again
+			// If this isn't the last attempt, wait with exponential backoff
 			if i < maxRetries-1 {
-				time.Sleep(time.Duration(i+1) * 200 * time.Millisecond)
+				delay := baseDelay * time.Duration(1<<uint(i)) // exponential backoff
+				time.Sleep(delay)
 				continue
 			}
 		}
 
-		// For non-timeout errors, don't retry
-		break
-	}
-
-	if err != nil {
-		errStr := strings.ToLower(err.Error())
+		// For non-timeout errors or final retry, return error
 		if strings.Contains(errStr, "timeout") || strings.Contains(errStr, "locked") {
-			initError = fmt.Errorf("database is locked by another process. Please wait and try again, or use 'dispense db info' to check database status: %w", err)
-		} else {
-			initError = fmt.Errorf("failed to open database after %d attempts: %w", maxRetries, err)
+			return nil, fmt.Errorf("database is temporarily locked by another process. Please try again in a moment: %w", err)
 		}
-		return nil, initError
+		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	sandboxDBInstance = &SandboxDB{db: db}
-	return sandboxDBInstance, nil
+	return nil, fmt.Errorf("failed to open database after %d attempts", maxRetries)
 }
 
-// GetSandboxDB returns the singleton instance if it exists, otherwise creates a new one
-func GetSandboxDB() (*SandboxDB, error) {
-	sandboxDBMutex.RLock()
-	if sandboxDBInstance != nil {
-		defer sandboxDBMutex.RUnlock()
-		return sandboxDBInstance, nil
-	}
-	sandboxDBMutex.RUnlock()
-
-	return NewSandboxDB()
-}
-
-// Close closes the database connection and resets the singleton
-func (sdb *SandboxDB) Close() error {
-	sandboxDBMutex.Lock()
-	defer sandboxDBMutex.Unlock()
-
-	if sdb.db != nil {
-		err := sdb.db.Close()
-		sandboxDBInstance = nil
-		initError = nil // Reset the initialization error
+// withDB executes a function with a database connection, handling open/close automatically
+func (sdb *SandboxDB) withDB(fn func(*storm.DB) error) error {
+	db, err := sdb.openDB()
+	if err != nil {
 		return err
 	}
-	return nil
+	defer db.Close()
+
+	return fn(db)
 }
 
-// ResetSingleton resets the singleton instance (useful for testing or error recovery)
-func ResetSingleton() {
-	sandboxDBMutex.Lock()
-	defer sandboxDBMutex.Unlock()
-
-	if sandboxDBInstance != nil && sandboxDBInstance.db != nil {
-		sandboxDBInstance.db.Close()
+// withWriteLock executes a function with file locking for write operations
+func (sdb *SandboxDB) withWriteLock(fn func(*storm.DB) error) error {
+	// Create lock file for write operations
+	lockPath := sdb.dbPath + ".lock"
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to create lock file: %w", err)
 	}
-	sandboxDBInstance = nil
-	initError = nil
+	defer func() {
+		lockFile.Close()
+		os.Remove(lockPath) // Clean up lock file
+	}()
+
+	// Acquire exclusive file lock with timeout
+	maxRetries := 3
+	baseDelay := 100 * time.Millisecond
+
+	for i := 0; i < maxRetries; i++ {
+		err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if err == nil {
+			break
+		}
+
+		if err == syscall.EWOULDBLOCK || err == syscall.EAGAIN {
+			if i < maxRetries-1 {
+				delay := baseDelay * time.Duration(1<<uint(i))
+				time.Sleep(delay)
+				continue
+			}
+			return fmt.Errorf("database is busy, please try again")
+		}
+
+		return fmt.Errorf("failed to acquire write lock: %w", err)
+	}
+
+	// Execute operation with database
+	return sdb.withDB(fn)
+}
+
+// GetDBPath returns the database file path (for external utilities)
+func GetDBPath() (string, error) {
+	return getDBPath()
 }
 
 // Save saves a sandbox to the database
@@ -152,13 +170,20 @@ func (sdb *SandboxDB) Save(sandbox *LocalSandbox) error {
 	if sandbox.CreatedAt.IsZero() {
 		sandbox.CreatedAt = time.Now()
 	}
-	return sdb.db.Save(sandbox)
+
+	return sdb.withWriteLock(func(db *storm.DB) error {
+		return db.Save(sandbox)
+	})
 }
 
 // GetByID retrieves a sandbox by ID
 func (sdb *SandboxDB) GetByID(id string) (*LocalSandbox, error) {
 	var sandbox LocalSandbox
-	err := sdb.db.One("ID", id, &sandbox)
+
+	err := sdb.withDB(func(db *storm.DB) error {
+		return db.One("ID", id, &sandbox)
+	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +193,11 @@ func (sdb *SandboxDB) GetByID(id string) (*LocalSandbox, error) {
 // GetByName retrieves a sandbox by name
 func (sdb *SandboxDB) GetByName(name string) (*LocalSandbox, error) {
 	var sandbox LocalSandbox
-	err := sdb.db.One("Name", name, &sandbox)
+
+	err := sdb.withDB(func(db *storm.DB) error {
+		return db.One("Name", name, &sandbox)
+	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +207,11 @@ func (sdb *SandboxDB) GetByName(name string) (*LocalSandbox, error) {
 // List retrieves all sandboxes
 func (sdb *SandboxDB) List() ([]*LocalSandbox, error) {
 	var sandboxes []*LocalSandbox
-	err := sdb.db.All(&sandboxes)
+
+	err := sdb.withDB(func(db *storm.DB) error {
+		return db.All(&sandboxes)
+	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +221,11 @@ func (sdb *SandboxDB) List() ([]*LocalSandbox, error) {
 // ListByGroup retrieves all sandboxes in a specific group
 func (sdb *SandboxDB) ListByGroup(group string) ([]*LocalSandbox, error) {
 	var sandboxes []*LocalSandbox
-	err := sdb.db.Find("Group", group, &sandboxes)
+
+	err := sdb.withDB(func(db *storm.DB) error {
+		return db.Find("Group", group, &sandboxes)
+	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -197,28 +234,35 @@ func (sdb *SandboxDB) ListByGroup(group string) ([]*LocalSandbox, error) {
 
 // Delete removes a sandbox from the database
 func (sdb *SandboxDB) Delete(id string) error {
-	var sandbox LocalSandbox
-	err := sdb.db.One("ID", id, &sandbox)
-	if err != nil {
-		return err
-	}
-	return sdb.db.DeleteStruct(&sandbox)
+	return sdb.withWriteLock(func(db *storm.DB) error {
+		var sandbox LocalSandbox
+		err := db.One("ID", id, &sandbox)
+		if err != nil {
+			return err
+		}
+		return db.DeleteStruct(&sandbox)
+	})
 }
 
 // DeleteByName removes a sandbox by name from the database
 func (sdb *SandboxDB) DeleteByName(name string) error {
-	var sandbox LocalSandbox
-	err := sdb.db.One("Name", name, &sandbox)
-	if err != nil {
-		return err
-	}
-	return sdb.db.DeleteStruct(&sandbox)
+	return sdb.withWriteLock(func(db *storm.DB) error {
+		var sandbox LocalSandbox
+		err := db.One("Name", name, &sandbox)
+		if err != nil {
+			return err
+		}
+		return db.DeleteStruct(&sandbox)
+	})
 }
 
 // Update updates an existing sandbox
 func (sdb *SandboxDB) Update(sandbox *LocalSandbox) error {
 	sandbox.UpdatedAt = time.Now()
-	return sdb.db.Update(sandbox)
+
+	return sdb.withWriteLock(func(db *storm.DB) error {
+		return db.Update(sandbox)
+	})
 }
 
 // ToSandboxInfo converts a LocalSandbox to sandbox.SandboxInfo

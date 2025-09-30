@@ -1,0 +1,85 @@
+{
+  "name": "dashboard",
+  "sourceRoot": "dashboard/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "@nx/webpack:webpack",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "dependsOn": ["api-client-ts:build"],
+      "options": {
+        "compiler": "babel",
+        "outputPath": "dist/dashboard",
+        "index": "dashboard/src/index.html",
+        "baseHref": "/",
+        "main": "dashboard/src/main.tsx",
+        "polyfills": "dashboard/src/polyfills.ts",
+        "tsConfig": "dashboard/tsconfig.json",
+        "assets": [
+          "dashboard/src/favicon.ico"
+        ],
+        "styles": ["dashboard/src/styles/globals.css"],
+        "scripts": [],
+        "webpackConfig": "dashboard/webpack.config.js"
+      },
+      "configurations": {
+        "development": {
+          "extractLicenses": false,
+          "optimization": false,
+          "sourceMap": true,
+          "vendorChunk": true,
+          "namedChunks": true
+        },
+        "production": {
+          "fileReplacements": [
+            {
+              "replace": "dashboard/src/environments/environment.ts",
+              "with": "dashboard/src/environments/environment.prod.ts"
+            }
+          ],
+          "optimization": true,
+          "extractLicenses": true,
+          "sourceMap": false,
+          "namedChunks": false,
+          "vendorChunk": false
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nx/webpack:dev-server",
+      "defaultConfiguration": "development",
+      "options": {
+        "buildTarget": "dashboard:build",
+        "hmr": true,
+        "port": 4200,
+        "host": "0.0.0.0"
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "dashboard:build:development"
+        },
+        "production": {
+          "buildTarget": "dashboard:build:production",
+          "hmr": false
+        }
+      }
+    },
+    "lint": {
+      "executor": "@nx/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["dashboard/**/*.{ts,tsx,js,jsx}"]
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/dashboard"],
+      "options": {
+        "jestConfig": "dashboard/jest.config.ts",
+        "passWithNoTests": true
+      }
+    }
+  },
+  "tags": []
+}

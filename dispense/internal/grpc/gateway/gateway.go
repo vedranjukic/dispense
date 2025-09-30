@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	pb "cli/internal/grpc/proto"
+	"cli/internal/dashboard"
 )
 
 // Gateway wraps the gRPC-Gateway server
@@ -48,10 +49,16 @@ func NewGateway(config *GatewayConfig) (*Gateway, error) {
 		return nil, err
 	}
 
+	// Create main HTTP handler that combines gRPC gateway and dashboard
+	mainHandler, err := createMainHandler(mux, config.APIKey)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create HTTP server
 	httpServer := &http.Server{
 		Addr:    config.HTTPAddress,
-		Handler: corsHandler(authMiddleware(mux, config.APIKey)),
+		Handler: corsHandler(mainHandler),
 	}
 
 	return &Gateway{
@@ -193,6 +200,28 @@ func getAPIKeyFromRequest(r *http.Request) string {
 
 	// Check query parameter
 	return r.URL.Query().Get("api_key")
+}
+
+// createMainHandler creates the main HTTP handler that routes between dashboard and API
+func createMainHandler(mux *runtime.ServeMux, apiKey string) (http.Handler, error) {
+	// Get dashboard handler
+	dashboardHandler, err := dashboard.GetHandler()
+	if err != nil {
+		return nil, err
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Route API requests to gRPC gateway with auth
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			// Strip /api prefix and route to gRPC gateway
+			r.URL.Path = strings.TrimPrefix(r.URL.Path, "/api")
+			authMiddleware(mux, apiKey).ServeHTTP(w, r)
+			return
+		}
+
+		// Route all other requests (including root) to dashboard
+		dashboardHandler.ServeHTTP(w, r)
+	}), nil
 }
 
 // skipAuthForPath determines if authentication should be skipped for certain paths

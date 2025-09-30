@@ -203,6 +203,8 @@ func startGRPCServer(ctx context.Context, grpcPort, apiKey string, enableReflect
 func startHTTPGateway(ctx context.Context, httpPort, grpcEndpoint, apiKey string) error {
 	fmt.Printf("🌐 HTTP gateway connecting to gRPC at %s\n", grpcEndpoint)
 	fmt.Printf("🌐 HTTP gateway listening on %s\n", httpPort)
+	fmt.Printf("📊 Dashboard web interface available at http://localhost%s\n", httpPort)
+	fmt.Printf("🔌 API endpoints available at http://localhost%s/api\n", httpPort)
 
 	// Create gateway
 	gatewayConfig := &gateway.GatewayConfig{

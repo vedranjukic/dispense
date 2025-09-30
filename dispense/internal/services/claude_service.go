@@ -3,7 +3,9 @@ package services
 import (
 	"context"
 	"fmt"
-	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -39,6 +41,18 @@ func (s *ClaudeService) RunTask(req *models.ClaudeTaskRequest) (*models.ClaudeTa
 		return nil, err
 	}
 
+	// Get API key (fetch fresh each time as it can change)
+	apiKey, err := s.getAnthropicAPIKey()
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeAPIKeyMissing, "failed to get Anthropic API key")
+	}
+
+	// Get working directory for the sandbox
+	workDir, err := s.getWorkingDirectoryFromProvider(sandboxInfo)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeSystemUnavailable, "failed to get working directory")
+	}
+
 	// Get daemon connection info
 	daemonAddr, err := s.getDaemonAddress(sandboxInfo)
 	if err != nil {
@@ -52,55 +66,103 @@ func (s *ClaudeService) RunTask(req *models.ClaudeTaskRequest) (*models.ClaudeTa
 	}
 	defer conn.Close()
 
-	// Create client and execute task
+	// Create client and create async task
 	client := pb.NewAgentServiceClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) // Shorter timeout for task creation
 	defer cancel()
 
-	grpcReq := &pb.ExecuteClaudeRequest{
-		Prompt: req.TaskDescription,
+	grpcReq := &pb.CreateTaskRequest{
+		Prompt:           req.TaskDescription,
+		WorkingDirectory: workDir,
+		EnvironmentVars:  make(map[string]string), // Add any needed env vars
+		AnthropicApiKey:  apiKey,
+		Model:           req.Model,
 	}
 
-	stream, err := client.ExecuteClaude(ctx, grpcReq)
+	resp, err := client.CreateTask(ctx, grpcReq)
 	if err != nil {
-		return nil, errors.Wrap(err, errors.ErrCodeSystemUnavailable, "failed to execute task")
+		return nil, errors.Wrap(err, errors.ErrCodeSystemUnavailable, "failed to create task")
 	}
 
-	// Collect all streaming responses
-	var output, errorMsg string
-	success := true
-
-	for {
-		resp, err := stream.Recv()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			success = false
-			errorMsg = err.Error()
-			break
-		}
-
-		switch resp.Type {
-		case pb.ExecuteClaudeResponse_STDOUT:
-			output += resp.Content
-		case pb.ExecuteClaudeResponse_STDERR:
-			errorMsg += resp.Content
-		case pb.ExecuteClaudeResponse_ERROR:
-			success = false
-			errorMsg += resp.Content
-		case pb.ExecuteClaudeResponse_STATUS:
-			if resp.ExitCode != 0 {
-				success = false
-			}
-		}
+	if !resp.Success {
+		return &models.ClaudeTaskResponse{
+			Success:  false,
+			ErrorMsg: resp.Message,
+		}, nil
 	}
 
+	// Return immediately with task ID for async execution
 	return &models.ClaudeTaskResponse{
-		Success:  success,
-		Output:   output,
-		ErrorMsg: errorMsg,
+		Success: true,
+		TaskID:  resp.TaskId,
+		Output:  resp.Message, // Success message from task creation
+	}, nil
+}
+
+// GetTaskStatus retrieves the status of a specific Claude task
+func (s *ClaudeService) GetTaskStatus(req *models.ClaudeTaskStatusRequest) (*models.ClaudeTaskStatusResponse, error) {
+	// Find the sandbox
+	sandboxInfo, err := s.sandboxService.FindByName(req.SandboxIdentifier)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get daemon connection info
+	daemonAddr, err := s.getDaemonAddress(sandboxInfo)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDaemonUnavailable, "failed to get daemon address")
+	}
+
+	// Connect to daemon
+	conn, err := s.connectToDaemon(daemonAddr)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDaemonUnavailable, "failed to connect to daemon")
+	}
+	defer conn.Close()
+
+	// Create client and get task status
+	client := pb.NewAgentServiceClient(conn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	grpcReq := &pb.TaskStatusRequest{
+		TaskId: req.TaskID,
+	}
+
+	resp, err := client.GetTaskStatus(ctx, grpcReq)
+	if err != nil {
+		return &models.ClaudeTaskStatusResponse{
+			Success:  false,
+			ErrorMsg: err.Error(),
+		}, nil
+	}
+
+	// Convert task state enum to string
+	var state string
+	switch resp.State {
+	case pb.TaskStatusResponse_PENDING:
+		state = "PENDING"
+	case pb.TaskStatusResponse_RUNNING:
+		state = "RUNNING"
+	case pb.TaskStatusResponse_COMPLETED:
+		state = "COMPLETED"
+	case pb.TaskStatusResponse_FAILED:
+		state = "FAILED"
+	default:
+		state = "UNKNOWN"
+	}
+
+	return &models.ClaudeTaskStatusResponse{
+		Success:    true,
+		State:      state,
+		Message:    resp.Message,
+		ExitCode:   resp.ExitCode,
+		StartedAt:  resp.StartedAt,
+		FinishedAt: resp.FinishedAt,
+		Prompt:     resp.Prompt,
+		WorkDir:    resp.WorkingDirectory,
 	}, nil
 }
 
@@ -181,24 +243,18 @@ func (s *ClaudeService) GetLogs(req *models.ClaudeLogsRequest) (*models.ClaudeLo
 
 // getDaemonAddress gets the daemon address for the sandbox
 func (s *ClaudeService) getDaemonAddress(sandboxInfo *models.SandboxInfo) (string, error) {
-	// This logic would determine the daemon address based on sandbox type
-	// For local sandboxes, it might be localhost with a mapped port
-	// For remote sandboxes, it might be the sandbox's public endpoint
-	
 	if sandboxInfo.Type == models.TypeLocal {
-		// For local sandboxes, daemon typically runs on a mapped port
-		if port, exists := sandboxInfo.Metadata["daemon_port"]; exists {
-			return fmt.Sprintf("localhost:%v", port), nil
+		// For local sandboxes, get the container IP and use port 28080
+		containerIP, err := s.getSandboxContainerIP(sandboxInfo)
+		if err != nil {
+			return "", errors.Wrap(err, errors.ErrCodeDaemonUnavailable, "failed to get container IP")
 		}
-		return "", errors.New(errors.ErrCodeDaemonUnavailable, "daemon port not found in sandbox metadata")
+		return fmt.Sprintf("%s:28080", containerIP), nil
 	}
 
-	// For remote sandboxes
-	if addr, exists := sandboxInfo.Metadata["daemon_address"]; exists {
-		return fmt.Sprintf("%v", addr), nil
-	}
-
-	return "", errors.New(errors.ErrCodeDaemonUnavailable, "daemon address not found in sandbox metadata")
+	// For remote sandboxes, use SSH port forwarding through provider
+	// This would need to be implemented similarly to CLI's approach
+	return "", errors.New(errors.ErrCodeDaemonUnavailable, "remote sandbox daemon connection not yet implemented in dashboard")
 }
 
 // connectToDaemon establishes a connection to the daemon
@@ -221,7 +277,96 @@ func (s *ClaudeService) connectToDaemon(address string) (*grpc.ClientConn, error
 func (s *ClaudeService) getWorkingDirectory(sandboxInfo *models.SandboxInfo) (string, error) {
 	// This would involve calling the appropriate provider to get the working directory
 	// Implementation depends on how the sandbox providers expose working directory info
+	_ = sandboxInfo // Suppress unused parameter warning for now
 	return "/workspace", nil // Default for now
+}
+
+// getWorkingDirectoryFromProvider gets the working directory from the appropriate provider based on sandbox type
+func (s *ClaudeService) getWorkingDirectoryFromProvider(sandboxInfo *models.SandboxInfo) (string, error) {
+	// Convert models.SandboxInfo to sandbox.SandboxInfo for provider compatibility
+	sbInfo := &sandbox.SandboxInfo{
+		ID:           sandboxInfo.ID,
+		Name:         sandboxInfo.Name,
+		Type:         sandbox.SandboxType(sandboxInfo.Type),
+		State:        sandboxInfo.State,
+		ShellCommand: sandboxInfo.ShellCommand,
+		Metadata:     sandboxInfo.Metadata,
+	}
+
+	// Get the appropriate provider based on sandbox type
+	if sandboxInfo.Type == models.TypeRemote {
+		remoteProvider, err := remote.NewProvider()
+		if err != nil {
+			return "", fmt.Errorf("failed to create remote provider: %w", err)
+		}
+		return remoteProvider.GetWorkDir(sbInfo)
+	} else {
+		// For local sandboxes, we can return the working directory directly
+		// without needing to create a new provider instance (which can cause database timeouts)
+		// since local sandboxes always use /workspace
+		return "/workspace", nil
+	}
+}
+
+// getAnthropicAPIKey retrieves the Anthropic API key from various sources
+func (s *ClaudeService) getAnthropicAPIKey() (string, error) {
+	// First try environment variable
+	if apiKey := os.Getenv("ANTHROPIC_API_KEY"); apiKey != "" {
+		return apiKey, nil
+	}
+
+	// Try app-specific config first
+	if apiKey, err := s.loadAppSpecificClaudeAPIKey(); err == nil && apiKey != "" {
+		return apiKey, nil
+	}
+
+	// Try to read from Claude config
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	// Try reading from Claude config file
+	claudeConfigPath := filepath.Join(homeDir, ".claude", "config.toml")
+	if content, err := os.ReadFile(claudeConfigPath); err == nil {
+		lines := strings.Split(string(content), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "api_key") && strings.Contains(line, "=") {
+				parts := strings.SplitN(line, "=", 2)
+				if len(parts) == 2 {
+					apiKey := strings.TrimSpace(strings.Trim(parts[1], `"`))
+					if apiKey != "" {
+						return apiKey, nil
+					}
+				}
+			}
+		}
+	}
+
+	return "", fmt.Errorf("no Anthropic API key found. Please set ANTHROPIC_API_KEY environment variable or configure Claude CLI")
+}
+
+// loadAppSpecificClaudeAPIKey tries to load API key from app-specific config
+func (s *ClaudeService) loadAppSpecificClaudeAPIKey() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+
+	configPath := filepath.Join(homeDir, ".dispense", "claude", "config")
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		return "", err
+	}
+
+	// Just return the trimmed content as the API key
+	apiKey := strings.TrimSpace(string(content))
+	if apiKey == "" {
+		return "", fmt.Errorf("API key not found in app-specific config")
+	}
+
+	return apiKey, nil
 }
 
 // retrieveLogsFromSandbox retrieves logs from the specified sandbox
@@ -386,4 +531,49 @@ func (s *ClaudeService) executeSandboxCommand(sandboxInfo *models.SandboxInfo, c
 	}
 
 	return []byte(result.Stdout), nil
+}
+
+// getSandboxContainerIP gets the IP address of a sandbox container using Docker commands
+func (s *ClaudeService) getSandboxContainerIP(sandboxInfo *models.SandboxInfo) (string, error) {
+	// Get container name from metadata
+	containerName, exists := sandboxInfo.Metadata["container_name"]
+	if !exists {
+		return "", fmt.Errorf("container_name not found in sandbox metadata")
+	}
+
+	// If the container name is truncated in metadata, find the full container name
+	containerNameStr := fmt.Sprintf("%v", containerName)
+	if len(containerNameStr) > 50 { // Metadata might be truncated
+		// Use the sandbox name to find the container
+		cmd := exec.Command("docker", "ps", "--filter", fmt.Sprintf("name=%s", sandboxInfo.Name), "--format", "{{.Names}}")
+		output, err := cmd.Output()
+		if err != nil {
+			return "", fmt.Errorf("failed to find container for sandbox %s: %w", sandboxInfo.Name, err)
+		}
+
+		containerNames := strings.TrimSpace(string(output))
+		if containerNames == "" {
+			return "", fmt.Errorf("no running container found for sandbox %s", sandboxInfo.Name)
+		}
+
+		// Take the first container name (most recent)
+		lines := strings.Split(containerNames, "\n")
+		if len(lines) > 0 {
+			containerNameStr = strings.TrimSpace(lines[0])
+		}
+	}
+
+	// Get the IP address of the container
+	cmd := exec.Command("docker", "inspect", containerNameStr, "--format", "{{.NetworkSettings.IPAddress}}")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get IP address for container %s: %w", containerNameStr, err)
+	}
+
+	ip := strings.TrimSpace(string(output))
+	if ip == "" {
+		return "", fmt.Errorf("no IP address found for container %s", containerNameStr)
+	}
+
+	return ip, nil
 }

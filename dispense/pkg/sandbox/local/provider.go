@@ -16,7 +16,6 @@ import (
 
 // Provider implements the local sandbox provider using Docker
 type Provider struct {
-	db             *database.SandboxDB
 	projectManager *project.Manager
 }
 
@@ -27,12 +26,6 @@ func NewProvider() (*Provider, error) {
 		return nil, fmt.Errorf("Docker not available: %w", err)
 	}
 
-	// Initialize database using singleton pattern
-	db, err := database.GetSandboxDB()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize sandbox database: %w", err)
-	}
-
 	// Initialize project manager
 	projectManager, err := project.NewManager()
 	if err != nil {
@@ -40,7 +33,6 @@ func NewProvider() (*Provider, error) {
 	}
 
 	return &Provider{
-		db:             db,
 		projectManager: projectManager,
 	}, nil
 }
@@ -52,9 +44,7 @@ func (p *Provider) GetType() sandbox.SandboxType {
 
 // Close closes the provider and cleans up resources
 func (p *Provider) Close() error {
-	if p.db != nil {
-		return p.db.Close()
-	}
+	// No longer maintaining database connections, nothing to close
 	return nil
 }
 
@@ -143,9 +133,14 @@ func (p *Provider) Create(opts *sandbox.CreateOptions) (*sandbox.SandboxInfo, er
 		localSandbox.Image = "vedranjukic/dispense-sandbox:0.0.1" // Default dispense sandbox image
 	}
 
-	err = p.db.Save(localSandbox)
+	db, err := database.GetSandboxDB()
 	if err != nil {
-		utils.DebugPrintf("Warning: Failed to save sandbox to database: %s\n", err)
+		utils.DebugPrintf("Warning: Failed to get database instance: %s\n", err)
+	} else {
+		err = db.Save(localSandbox)
+		if err != nil {
+			utils.DebugPrintf("Warning: Failed to save sandbox to database: %s\n", err)
+		}
 	}
 
 	return sandboxInfo, nil
@@ -270,11 +265,17 @@ func (p *Provider) CloneGitHubRepo(sandboxInfo *sandbox.SandboxInfo, owner, repo
 func (p *Provider) GetInfo(id string) (*sandbox.SandboxInfo, error) {
 	utils.DebugPrintf("Getting info for local sandbox %s\n", id)
 
+	// Get database instance for this operation
+	db, err := database.GetSandboxDB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database instance: %w", err)
+	}
+
 	// Try to get sandbox from database first
-	localSandbox, err := p.db.GetByID(id)
+	localSandbox, err := db.GetByID(id)
 	if err != nil {
 		// Try by name if ID lookup failed
-		localSandbox, err = p.db.GetByName(id)
+		localSandbox, err = db.GetByName(id)
 		if err != nil {
 			return nil, fmt.Errorf("local sandbox not found: %w", err)
 		}
@@ -292,11 +293,18 @@ func (p *Provider) GetInfo(id string) (*sandbox.SandboxInfo, error) {
 func (p *Provider) List() ([]*sandbox.SandboxInfo, error) {
 	utils.DebugPrintf("Listing local sandboxes\n")
 
-	// Get all sandboxes from database
-	localSandboxes, err := p.db.List()
+	// Get database instance for this operation
+	db, err := database.GetSandboxDB()
 	if err != nil {
-		utils.DebugPrintf("Failed to list from database: %v, falling back to Docker containers\n", err)
-		localSandboxes = []*database.LocalSandbox{}
+		utils.DebugPrintf("Failed to get database instance: %v, falling back to empty list\n", err)
+		return []*sandbox.SandboxInfo{}, nil
+	}
+
+	// Get all sandboxes from database
+	localSandboxes, err := db.List()
+	if err != nil {
+		utils.DebugPrintf("Failed to list from database: %v, falling back to empty list\n", err)
+		return []*sandbox.SandboxInfo{}, nil
 	}
 
 	// Convert to SandboxInfo slice
@@ -312,8 +320,15 @@ func (p *Provider) List() ([]*sandbox.SandboxInfo, error) {
 func (p *Provider) ListByGroup(group string) ([]*sandbox.SandboxInfo, error) {
 	utils.DebugPrintf("Listing local sandboxes in group: %s\n", group)
 
+	// Get database instance for this operation
+	db, err := database.GetSandboxDB()
+	if err != nil {
+		utils.DebugPrintf("Failed to get database instance: %v\n", err)
+		return []*sandbox.SandboxInfo{}, nil
+	}
+
 	// Get sandboxes by group from database
-	localSandboxes, err := p.db.ListByGroup(group)
+	localSandboxes, err := db.ListByGroup(group)
 	if err != nil {
 		utils.DebugPrintf("Failed to list by group from database: %v\n", err)
 		return []*sandbox.SandboxInfo{}, nil
@@ -332,11 +347,17 @@ func (p *Provider) ListByGroup(group string) ([]*sandbox.SandboxInfo, error) {
 func (p *Provider) Delete(id string) error {
 	utils.DebugPrintf("Deleting local sandbox %s\n", id)
 
+	// Get database instance for this operation
+	db, err := database.GetSandboxDB()
+	if err != nil {
+		return fmt.Errorf("failed to get database instance: %w", err)
+	}
+
 	// Get sandbox info from database first
-	localSandbox, err := p.db.GetByID(id)
+	localSandbox, err := db.GetByID(id)
 	if err != nil {
 		// Try by name if ID lookup failed
-		localSandbox, err = p.db.GetByName(id)
+		localSandbox, err = db.GetByName(id)
 		if err != nil {
 			return fmt.Errorf("sandbox not found in database: %w", err)
 		}
@@ -370,7 +391,7 @@ func (p *Provider) Delete(id string) error {
 	}
 
 	// Remove from database
-	err = p.db.Delete(localSandbox.ID)
+	err = db.Delete(localSandbox.ID)
 	if err != nil {
 		return fmt.Errorf("failed to remove sandbox from database: %w", err)
 	}
