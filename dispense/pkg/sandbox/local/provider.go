@@ -130,7 +130,7 @@ func (p *Provider) Create(opts *sandbox.CreateOptions) (*sandbox.SandboxInfo, er
 	// Save to database for future reference
 	localSandbox := database.FromSandboxInfo(sandboxInfo, containerID, opts.Snapshot, opts.TaskData)
 	if localSandbox.Image == "" {
-		localSandbox.Image = "vedranjukic/dispense-sandbox:0.0.1" // Default dispense sandbox image
+		localSandbox.Image = "vedranjukic/dispense-sandbox:0.0.2" // Default dispense sandbox image
 	}
 
 	db, err := database.GetSandboxDB()
@@ -435,7 +435,7 @@ func isAlphaNumeric(c byte) bool {
 // createContainer creates and starts a Docker container with the project volume mounted
 func (p *Provider) createContainer(containerName, projectPath string, opts *sandbox.CreateOptions) (string, error) {
 	// Determine Docker image to use
-	imageName := "vedranjukic/dispense-sandbox:0.0.1" // Default dispense sandbox image
+	imageName := "vedranjukic/dispense-sandbox:0.0.2" // Default dispense sandbox image
 	if opts.Snapshot != "" {
 		imageName = opts.Snapshot
 	}

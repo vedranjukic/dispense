@@ -7,9 +7,12 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -235,7 +238,7 @@ Usage:
   cli claude <sandbox-name> status
   cli claude <sandbox-name> run "prompt"
   cli claude <sandbox-name> tasks [task-id]
-  cli claude <sandbox-name> logs [task-id]`,
+  cli claude <sandbox-name> logs [task-id] [--format=human|raw] [--follow]`,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) < 2 {
@@ -288,7 +291,9 @@ Usage:
 			if len(args) > 2 {
 				taskID = args[2]
 			}
-			if err := showClaudeLogs(taskID, sandboxName); err != nil {
+			formatFlag, _ := cmd.Flags().GetString("format")
+			followFlag, _ := cmd.Flags().GetBool("follow")
+			if err := showClaudeLogs(taskID, sandboxName, formatFlag == "human", followFlag); err != nil {
 				fmt.Fprintf(os.Stderr, "❌ Failed to show Claude logs: %s\n", err)
 				os.Exit(1)
 			}
@@ -363,6 +368,41 @@ func checkClaudeDaemonStatus(sandboxName string) error {
 	}
 
 	return nil
+}
+
+// getTaskStatus returns the current task status for the sandbox
+func getTaskStatus(sandboxName, taskID string) (pb.TaskStatusResponse_TaskState, error) {
+	// Get daemon connection (works with both local and remote)
+	daemonAddr, cleanup, err := getDaemonConnection(sandboxName)
+	if err != nil {
+		return pb.TaskStatusResponse_PENDING, fmt.Errorf("failed to get daemon connection: %w", err)
+	}
+	defer cleanup()
+
+	// Try to connect to the daemon
+	conn, err := grpc.NewClient(daemonAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return pb.TaskStatusResponse_PENDING, fmt.Errorf("daemon not reachable at %s: %w", daemonAddr, err)
+	}
+	defer conn.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	client := pb.NewAgentServiceClient(conn)
+
+	// Get status of the specific task (empty task ID returns latest task status)
+	status, err := client.GetTaskStatus(ctx, &pb.TaskStatusRequest{TaskId: taskID})
+	if err != nil {
+		// If there's an error (e.g., no tasks found), assume completed
+		return pb.TaskStatusResponse_COMPLETED, nil
+	}
+
+	if status != nil {
+		return status.State, nil
+	}
+
+	return pb.TaskStatusResponse_COMPLETED, nil
 }
 
 // runClaudeWithPrompt executes Claude with the given prompt
@@ -537,7 +577,7 @@ func listClaudeTasks(sandboxName, taskID string) error {
 }
 
 // showClaudeLogs displays logs for a specific task or recent logs
-func showClaudeLogs(taskID string, sandboxName string) error {
+func showClaudeLogs(taskID string, sandboxName string, humanFormat bool, follow bool) error {
 	if sandboxName == "" {
 		return fmt.Errorf("sandbox name is required. Use --sandbox flag to specify which sandbox to get logs from")
 	}
@@ -585,7 +625,9 @@ func showClaudeLogs(taskID string, sandboxName string) error {
 		if len(logFiles) > 0 {
 			// Take the most recent log file (first in the list since ls -la shows newest first by default)
 			mostRecentFile := logFiles[0]
-			return showLogFileFromSandbox(sandboxName, sandboxLogDir, mostRecentFile)
+			// Extract taskID from filename (remove .log extension)
+			mostRecentTaskID := strings.TrimSuffix(mostRecentFile, ".log")
+			return showLogFileFromSandbox(sandboxName, sandboxLogDir, mostRecentFile, humanFormat, follow, mostRecentTaskID)
 		} else {
 			fmt.Printf("📋 No Claude log files found in sandbox\n")
 			return nil
@@ -593,13 +635,13 @@ func showClaudeLogs(taskID string, sandboxName string) error {
 	} else {
 		// Show specific task logs
 		logFile := fmt.Sprintf("%s.log", taskID)
-		return showLogFileFromSandbox(sandboxName, sandboxLogDir, logFile)
+		return showLogFileFromSandbox(sandboxName, sandboxLogDir, logFile, humanFormat, follow, taskID)
 	}
 }
 
 
 // showLogFileFromSandbox displays the contents of a log file from inside a sandbox
-func showLogFileFromSandbox(sandboxName, logDir, filename string) error {
+func showLogFileFromSandbox(sandboxName, logDir, filename string, humanFormat bool, follow bool, taskID string) error {
 	logPath := filepath.Join(logDir, filename)
 
 	// Check if log file exists in sandbox
@@ -608,18 +650,484 @@ func showLogFileFromSandbox(sandboxName, logDir, filename string) error {
 		return fmt.Errorf("log file not found in sandbox: %s", filename)
 	}
 
-	fmt.Printf("📄 Log file: %s (from sandbox)\n", filename)
-	fmt.Printf("─────────────────────────────────────\n")
-
-	// Read and display the log file content
-	output, err := executeSandboxCommand(sandboxName, []string{"cat", logPath})
-	if err != nil {
-		return fmt.Errorf("failed to read log file from sandbox: %w", err)
+	if follow {
+		return followLogFile(sandboxName, logPath, filename, humanFormat, taskID)
 	}
 
-	fmt.Print(string(output))
+	if humanFormat {
+		fmt.Printf("📄 Human-readable log: %s (from sandbox)\n", filename)
+		fmt.Printf("─────────────────────────────────────\n")
+
+		// Read and display the log file content with human formatting
+		output, err := executeSandboxCommand(sandboxName, []string{"cat", logPath})
+		if err != nil {
+			return fmt.Errorf("failed to read log file from sandbox: %w", err)
+		}
+
+		if err := formatLogOutput(string(output)); err != nil {
+			fmt.Printf("❌ Error formatting log: %v\n", err)
+			fmt.Print(string(output)) // Fall back to raw output
+		}
+	} else {
+		fmt.Printf("📄 Raw log file: %s (from sandbox)\n", filename)
+		fmt.Printf("─────────────────────────────────────\n")
+
+		// Read and display the log file content
+		output, err := executeSandboxCommand(sandboxName, []string{"cat", logPath})
+		if err != nil {
+			return fmt.Errorf("failed to read log file from sandbox: %w", err)
+		}
+
+		fmt.Print(string(output))
+	}
+
 	fmt.Printf("─────────────────────────────────────\n")
 	return nil
+}
+
+// followLogFile follows a log file in real-time until the task completes
+func followLogFile(sandboxName, logPath, filename string, humanFormat bool, taskID string) error {
+	fmt.Printf("📄 Following log: %s (from sandbox) - Press Ctrl+C to stop\n", filename)
+	fmt.Printf("─────────────────────────────────────\n")
+
+	// Set up signal handling for graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-sigChan
+		fmt.Printf("\r\033[K📋 Log following stopped by user\n")
+		cancel()
+	}()
+
+	var lastSize int64 = 0
+	var lastActivity time.Time = time.Now()
+	var isWorking bool = false
+	var workingState WorkingState = WorkingStateProcessing
+
+	// Start spinner animation
+	spinnerDone := make(chan struct{})
+	defer close(spinnerDone)
+	go startSpinner(&isWorking, &workingState, spinnerDone)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			// Check if file still exists
+			_, err := executeSandboxCommand(sandboxName, []string{"test", "-f", logPath})
+			if err != nil {
+				// If file doesn't exist, wait and retry
+				time.Sleep(1 * time.Second)
+				continue
+			}
+
+			// Get current file size
+			sizeOutput, err := executeSandboxCommand(sandboxName, []string{"stat", "-c", "%s", logPath})
+			if err != nil {
+				time.Sleep(1 * time.Second)
+				continue
+			}
+
+			currentSize, err := strconv.ParseInt(strings.TrimSpace(string(sizeOutput)), 10, 64)
+			if err != nil {
+				time.Sleep(1 * time.Second)
+				continue
+			}
+
+			// If file has grown, read the new content
+			if currentSize > lastSize {
+				// Use tail to read new content from the last position
+				tailOutput, err := executeSandboxCommand(sandboxName, []string{"tail", "-c", fmt.Sprintf("+%d", lastSize+1), logPath})
+				if err != nil {
+					time.Sleep(1 * time.Second)
+					continue
+				}
+
+				newContent := string(tailOutput)
+				if newContent != "" {
+					if humanFormat {
+						// Process each line for follow mode with minimal output
+						lines := strings.Split(strings.TrimRight(newContent, "\n"), "\n")
+						for _, line := range lines {
+							if strings.TrimSpace(line) != "" {
+								processLogLineForFollow(line, &lastActivity, &isWorking, &workingState)
+							}
+						}
+					} else {
+						// Print raw content but clear the working indicator first
+						if isWorking {
+							fmt.Print("\r\033[K")
+						}
+						fmt.Print(newContent)
+						// Raw mode doesn't use advanced working states
+						if isWorking {
+							fmt.Print("⠋ Working...")
+						}
+					}
+
+					// No need to parse content for completion - we'll check status below
+				}
+
+				lastSize = currentSize
+			}
+
+			// Check task status to see if it's still running
+			taskStatus, err := getTaskStatus(sandboxName, taskID)
+			if err != nil {
+				// If we can't get status, assume task is completed and exit
+				utils.DebugPrintf("Failed to get task status: %v\n", err)
+				fmt.Printf("\r\033[K🏁 Task completed - log following ended\n")
+				fmt.Printf("─────────────────────────────────────\n")
+				return nil
+			}
+
+			// Exit if task is no longer running
+			switch taskStatus {
+			case pb.TaskStatusResponse_COMPLETED:
+				fmt.Printf("\r\033[K🟢 Task completed - log following ended\n")
+				fmt.Printf("─────────────────────────────────────\n")
+				return nil
+			case pb.TaskStatusResponse_FAILED:
+				fmt.Printf("\r\033[K🔴 Task failed - log following ended\n")
+				fmt.Printf("─────────────────────────────────────\n")
+				return nil
+			case pb.TaskStatusResponse_RUNNING:
+				// Continue following
+			default:
+				// For PENDING or unknown states, assume completed
+				fmt.Printf("\r\033[K🏁 Task finished - log following ended\n")
+				fmt.Printf("─────────────────────────────────────\n")
+				return nil
+			}
+
+			// Sleep before next check
+			time.Sleep(500 * time.Millisecond)
+		}
+	}
+}
+
+// processLogLineForFollow processes a single log line for follow mode with minimal output
+func processLogLineForFollow(line string, lastActivity *time.Time, isWorking *bool, workingState *WorkingState) {
+	// Use regex to parse log line format: [timestamp] [type] content
+	logEntryRegex := regexp.MustCompile(`^\[([^\]]+)\] \[([^\]]+)\] (.*)$`)
+	matches := logEntryRegex.FindStringSubmatch(line)
+
+	if len(matches) != 4 {
+		// Not a structured log entry, print as-is only if it's important
+		if strings.Contains(line, "ERROR") || strings.Contains(line, "FATAL") {
+			fmt.Println(line)
+		}
+		return
+	}
+
+	timestamp := matches[1]
+	logType := matches[2]
+	content := matches[3]
+
+	// Parse timestamp for display
+	var currentTime string
+	if t, err := time.Parse(time.RFC3339, timestamp); err == nil {
+		currentTime = t.Format("15:04:05")
+	} else {
+		currentTime = timestamp
+	}
+
+	// Update last activity time
+	*lastActivity = time.Now()
+
+	switch logType {
+	case "STDOUT":
+		formatClaudeJSONForFollow(content, currentTime, isWorking, workingState)
+	case "STDERR":
+		// Show errors and warnings
+		fmt.Printf("\r\033[K[%s] ⚠️  %s\n", currentTime, content)
+	case "ERROR":
+		fmt.Printf("\r\033[K[%s] ❌ %s\n", currentTime, content)
+	default:
+		// Skip other log types to reduce noise
+	}
+}
+
+// formatClaudeJSONForFollow formats Claude messages for follow mode with minimal output
+func formatClaudeJSONForFollow(jsonLine string, timestamp string, isWorking *bool, workingState *WorkingState) {
+	// Skip empty lines
+	if strings.TrimSpace(jsonLine) == "" {
+		return
+	}
+
+	// Try to parse as Claude message
+	var claudeMsg map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonLine), &claudeMsg); err != nil {
+		// If it's not JSON and looks important, show it
+		if len(jsonLine) > 10 && !strings.Contains(jsonLine, "thinking") {
+			fmt.Printf("\r\033[K[%s] 💬 %s\n", timestamp, jsonLine)
+			showWorkingIndicator(*isWorking)
+		}
+		return
+	}
+
+	msgType, _ := claudeMsg["type"].(string)
+	switch msgType {
+	case "user":
+		// Don't show "Task Started" - just update working state
+		*isWorking = true
+		*workingState = WorkingStateThinking
+
+	case "assistant":
+		if message, ok := claudeMsg["message"].(map[string]interface{}); ok {
+			if content, ok := message["content"].([]interface{}); ok {
+				for _, item := range content {
+					if contentItem, ok := item.(map[string]interface{}); ok {
+						contentType, _ := contentItem["type"].(string)
+						switch contentType {
+						case "text":
+							if text, ok := contentItem["text"].(string); ok && text != "" {
+								// Show actual Claude responses (thinking/planning/outcomes)
+								fmt.Printf("\r\033[K[%s] 💭 %s\n", timestamp, text)
+								*workingState = WorkingStateThinking
+							}
+						case "tool_use":
+							// Update working state for tool usage
+							*isWorking = true
+							*workingState = WorkingStateTooling
+						}
+					}
+				}
+			}
+		}
+
+	case "stream_event":
+		if event, ok := claudeMsg["event"].(map[string]interface{}); ok {
+			eventType, _ := event["type"].(string)
+			switch eventType {
+			case "message_start":
+				*isWorking = true
+				*workingState = WorkingStateProcessing
+			case "message_stop":
+				// Don't show "Claude Finished" - just update state
+				*isWorking = false
+				*workingState = WorkingStateIdle
+			case "content_block_start":
+				*isWorking = true
+				*workingState = WorkingStateThinking
+			case "content_block_stop":
+				// Keep working indicator until message stops
+			}
+		}
+
+	case "system":
+		// Don't show system messages - just update state
+		*isWorking = true
+		*workingState = WorkingStateProcessing
+
+	case "result":
+		// Show only meaningful result information
+		if message, ok := claudeMsg["message"].(map[string]interface{}); ok {
+			if durationMs, ok := message["duration_ms"].(float64); ok {
+				duration := time.Duration(durationMs) * time.Millisecond
+				fmt.Printf("\r\033[K[%s] ✅ Task completed in %s\n", timestamp, duration.String())
+			} else {
+				fmt.Printf("\r\033[K[%s] ✅ Task completed\n", timestamp)
+			}
+		}
+		*isWorking = false
+		*workingState = WorkingStateIdle
+	}
+}
+
+// showWorkingIndicator shows a working indicator if task is active
+func showWorkingIndicator(isWorking bool) {
+	if isWorking {
+		fmt.Print("🔄 Working...")
+	}
+}
+
+// WorkingState represents different types of activity
+type WorkingState int
+
+const (
+	WorkingStateIdle WorkingState = iota
+	WorkingStateProcessing
+	WorkingStateTooling
+	WorkingStateThinking
+)
+
+// startSpinner starts a background spinner animation with different indicators
+func startSpinner(isWorking *bool, workingState *WorkingState, done chan struct{}) {
+	spinners := map[WorkingState][]string{
+		WorkingStateProcessing: {"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"},
+		WorkingStateTooling:    {"🔧", "⚙️", "🛠️", "🔨"},
+		WorkingStateThinking:   {"🤔", "💭", "🧠", "💡"},
+	}
+
+	messages := map[WorkingState]string{
+		WorkingStateProcessing: "Working...",
+		WorkingStateTooling:    "Using tools...",
+		WorkingStateThinking:   "Thinking...",
+	}
+
+	i := 0
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			if *isWorking {
+				currentSpinner := spinners[*workingState]
+				currentMessage := messages[*workingState]
+
+				if len(currentSpinner) > 0 {
+					fmt.Printf("\r%s %s", currentSpinner[i%len(currentSpinner)], currentMessage)
+					i++
+				}
+			}
+		}
+	}
+}
+
+// formatLogOutput formats raw log output into human-readable format
+func formatLogOutput(rawLog string) error {
+	lines := strings.Split(rawLog, "\n")
+	logEntryRegex := regexp.MustCompile(`^\[([^\]]+)\] \[([^\]]+)\] (.*)$`)
+
+	var taskPrompt string
+	var currentTime string
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Match log entry format: [timestamp] [type] content
+		matches := logEntryRegex.FindStringSubmatch(line)
+		if len(matches) != 4 {
+			// Not a structured log entry, print as-is
+			fmt.Println(line)
+			continue
+		}
+
+		timestamp := matches[1]
+		logType := matches[2]
+		content := matches[3]
+
+		// Parse timestamp for display
+		if t, err := time.Parse(time.RFC3339, timestamp); err == nil {
+			currentTime = t.Format("15:04:05")
+		} else {
+			currentTime = timestamp
+		}
+
+		switch logType {
+		case "STDOUT":
+			formatClaudeJSON(content, taskPrompt, currentTime)
+		case "STDERR":
+			fmt.Printf("[%s] ⚠️  %s\n", currentTime, content)
+		case "ERROR":
+			fmt.Printf("[%s] ❌ %s\n", currentTime, content)
+		case "STATUS":
+			fmt.Printf("[%s] ℹ️  %s\n", currentTime, content)
+		default:
+			fmt.Printf("[%s] [%s] %s\n", currentTime, logType, content)
+		}
+	}
+
+	return nil
+}
+
+// formatClaudeJSON formats a Claude JSON output line into human-readable format
+func formatClaudeJSON(jsonLine string, taskPrompt string, timestamp string) {
+	// Skip empty lines
+	if strings.TrimSpace(jsonLine) == "" {
+		return
+	}
+
+	// Try to parse as Claude message
+	var claudeMsg map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonLine), &claudeMsg); err != nil {
+		// If it's not JSON, treat as plain text output
+		fmt.Printf("[%s] 💬 %s\n", timestamp, jsonLine)
+		return
+	}
+
+	msgType, _ := claudeMsg["type"].(string)
+	switch msgType {
+	case "user":
+		fmt.Printf("[%s] 👤 **Task Started**\n", timestamp)
+		if taskPrompt != "" {
+			fmt.Printf("[%s] 📝 **Prompt**: %s\n", timestamp, taskPrompt)
+		}
+	case "assistant":
+		if message, ok := claudeMsg["message"].(map[string]interface{}); ok {
+			if content, ok := message["content"].([]interface{}); ok {
+				for _, item := range content {
+					if contentItem, ok := item.(map[string]interface{}); ok {
+						contentType, _ := contentItem["type"].(string)
+						switch contentType {
+						case "text":
+							if text, ok := contentItem["text"].(string); ok && text != "" {
+								fmt.Printf("[%s] 🤖 %s\n", timestamp, text)
+							}
+						case "tool_use":
+							if name, ok := contentItem["name"].(string); ok {
+								fmt.Printf("[%s] 🛠️  **Using %s**\n", timestamp, name)
+							}
+						}
+					}
+				}
+			}
+		}
+	case "stream_event":
+		if event, ok := claudeMsg["event"].(map[string]interface{}); ok {
+			eventType, _ := event["type"].(string)
+			switch eventType {
+			case "content_block_start":
+				fmt.Printf("[%s] ⏳ Claude is thinking...\n", timestamp)
+			case "content_block_stop":
+				fmt.Printf("\n[%s] ✅ Response complete\n", timestamp)
+			case "message_start":
+				fmt.Printf("[%s] 🚀 **Claude Started Working**\n", timestamp)
+			case "message_stop":
+				fmt.Printf("[%s] 🏁 **Claude Finished**\n", timestamp)
+			}
+		}
+	case "system":
+		fmt.Printf("[%s] ⚙️  **System Initialized**\n", timestamp)
+		if message, ok := claudeMsg["message"].(map[string]interface{}); ok {
+			if workDir, ok := message["current_working_dir"].(string); ok && workDir != "" {
+				fmt.Printf("[%s] 📂 Working Directory: %s\n", timestamp, workDir)
+			}
+			if model, ok := message["model"].(string); ok && model != "" {
+				fmt.Printf("[%s] 🧠 Model: %s\n", timestamp, model)
+			}
+		}
+	case "result":
+		fmt.Printf("[%s] 📊 **Task Summary**\n", timestamp)
+		if message, ok := claudeMsg["message"].(map[string]interface{}); ok {
+			if durationMs, ok := message["duration_ms"].(float64); ok {
+				duration := time.Duration(durationMs) * time.Millisecond
+				fmt.Printf("[%s] ⏱️  Duration: %s\n", timestamp, duration.String())
+			}
+			if inputTokens, ok := message["input_tokens"].(float64); ok {
+				if outputTokens, ok := message["output_tokens"].(float64); ok {
+					fmt.Printf("[%s] 🔤 Tokens: %.0f input, %.0f output\n", timestamp, inputTokens, outputTokens)
+				}
+			}
+			if totalCost, ok := message["total_cost"].(float64); ok && totalCost > 0 {
+				fmt.Printf("[%s] 💰 Cost: $%.4f\n", timestamp, totalCost)
+			}
+		}
+	default:
+		fmt.Printf("[%s] ❓ %s\n", timestamp, jsonLine)
+	}
 }
 
 // runClaudeOnGitHubIssue starts Claude working on the GitHub issue from the sandbox's task data
@@ -910,7 +1418,7 @@ func getWorkDirFromProvider(sandboxName string) (string, error) {
 }
 
 func init() {
-	// Claude command now handles all subcommands inline
-	// No subcommand registration needed - all handled in the main Run function
-	// Optionally add workdir flag for run command if needed in future
+	// Add format flag specifically to claude command
+	claudeCmd.Flags().String("format", "human", "Log output format: raw or human")
+	claudeCmd.Flags().BoolP("follow", "f", false, "Follow log output in real-time until task completes")
 }

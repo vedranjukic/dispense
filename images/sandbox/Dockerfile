@@ -45,7 +45,7 @@ RUN useradd -m daytona && echo "daytona ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d
 RUN bash -c "source /usr/local/share/nvm/nvm.sh && nvm install node && nvm use node" \
   && chown -R daytona:daytona /usr/local/share/nvm
 
-RUN npm install -g ts-node typescript typescript-language-server @anthropic-ai/claude-code
+RUN npm install -g ts-node typescript typescript-language-server @anthropic-ai/claude-code@2.0.1
 
 # Create directory for computer use plugin
 RUN mkdir -p /usr/local/lib && chown daytona:daytona /usr/local/lib

@@ -297,13 +297,21 @@ func (tm *TaskManager) streamOutput(taskID string, pipe io.ReadCloser, streamTyp
 		line := scanner.Text()
 		timestamp := time.Now().Format(time.RFC3339)
 
-		// Write to log file
-		logEntry := fmt.Sprintf("[%s] [%s] %s\n", timestamp, streamType, line)
-		task.LogFile.WriteString(logEntry)
+		// Write raw format to log file (for backwards compatibility)
+		rawLogEntry := fmt.Sprintf("[%s] [%s] %s\n", timestamp, streamType, line)
+		task.LogFile.WriteString(rawLogEntry)
 		task.LogFile.Sync() // Ensure data is written to disk immediately
 
-		// Log to daemon logs as well
-		log.Printf("Task %s [%s]: %s", taskID, streamType, line)
+		// For STDOUT, format the Claude output for human readability in daemon logs
+		if streamType == "STDOUT" {
+			formattedOutput := FormatClaudeOutput(line, task.Prompt)
+			if formattedOutput != "" {
+				log.Printf("Task %s: %s", taskID, strings.TrimSpace(formattedOutput))
+			}
+		} else {
+			// Log STDERR as-is
+			log.Printf("Task %s [%s]: %s", taskID, streamType, line)
+		}
 	}
 
 	if err := scanner.Err(); err != nil {

@@ -57,15 +57,17 @@ var deleteCmd = &cobra.Command{
 			}
 		}
 
-		// If not found locally, try remote provider
+		// If not found locally, try remote provider (non-interactive)
 		if sandboxInfo == nil {
-			remoteProvider, err := remote.NewProvider()
+			remoteProvider, err := remote.NewProviderNonInteractive()
 			if err == nil {
 				sandboxInfo, err = findRemoteSandbox(remoteProvider, sandboxIdentifier)
 				if err == nil {
 					provider = remoteProvider
 					utils.DebugPrintf("Found remote sandbox: %s\n", sandboxInfo.Name)
 				}
+			} else {
+				utils.DebugPrintf("Remote provider not available (no API key): %v\n", err)
 			}
 		}
 
@@ -159,8 +161,8 @@ func deleteAllSandboxes(force bool) {
 		utils.DebugPrintf("Warning: Failed to create local provider: %s\n", err)
 	}
 
-	// Collect all sandboxes from remote provider
-	remoteProvider, err := remote.NewProvider()
+	// Collect all sandboxes from remote provider (non-interactive)
+	remoteProvider, err := remote.NewProviderNonInteractive()
 	if err == nil {
 		remoteSandboxes, err := remoteProvider.List()
 		if err == nil {
@@ -172,7 +174,7 @@ func deleteAllSandboxes(force bool) {
 			utils.DebugPrintf("Warning: Failed to list remote sandboxes: %s\n", err)
 		}
 	} else {
-		utils.DebugPrintf("Warning: Failed to create remote provider: %s\n", err)
+		utils.DebugPrintf("Remote provider not available (no API key): %v\n", err)
 	}
 
 	if len(allSandboxes) == 0 {
