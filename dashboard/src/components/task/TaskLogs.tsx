@@ -1,80 +1,73 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { TaskLogsProps } from '../../types/task';
 import { useTasks } from '../../hooks/useTasks';
 import { formatLogType, formatTimestamp, parseLogContent } from '../../utils/formatters';
-import { RunClaudeTaskResponseType } from '@api-client-ts';
+import { RunClaudeTaskResponseType, StreamTaskLogsResponseType } from '@api-client-ts';
+import FormattedText from '../common/FormattedText';
 
 export default function TaskLogs({ sandboxId, taskId, onTaskComplete }: TaskLogsProps) {
-  const { logs, isRunning, isLoading, error } = useTasks(sandboxId);
-  const [autoScroll, setAutoScroll] = useState(true);
-  const [filter, setFilter] = useState<RunClaudeTaskResponseType | 'all'>('all');
+  const { logs, isRunning, isLoading, error, taskHistory, currentTask } = useTasks(sandboxId);
   const logsEndRef = useRef<HTMLDivElement>(null);
-  const logsContainerRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new logs arrive
   useEffect(() => {
-    if (autoScroll && logsEndRef.current) {
+    if (logsEndRef.current) {
       logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [logs, autoScroll]);
+  }, [logs]);
 
   // Handle task completion
   useEffect(() => {
     const lastLog = logs[logs.length - 1];
-    if (lastLog && lastLog.isFinished && lastLog.exitCode !== undefined) {
+    if (lastLog && (lastLog.isFinished || lastLog.taskCompleted) && lastLog.exitCode !== undefined) {
       onTaskComplete(lastLog.exitCode);
     }
   }, [logs, onTaskComplete]);
 
-  const handleScroll = () => {
-    if (!logsContainerRef.current) return;
 
-    const { scrollTop, scrollHeight, clientHeight } = logsContainerRef.current;
-    const isAtBottom = scrollHeight - scrollTop <= clientHeight + 50;
-    setAutoScroll(isAtBottom);
-  };
-
-  const filteredLogs = filter === 'all'
-    ? logs
-    : logs.filter(log => log.type === filter);
-
-  const getLogTypeColor = (type: RunClaudeTaskResponseType) => {
+  const getLogTypeColor = (type: RunClaudeTaskResponseType | StreamTaskLogsResponseType) => {
+    // Handle both old and new log types
     switch (type) {
       case RunClaudeTaskResponseType.STDOUT:
+      case StreamTaskLogsResponseType.STDOUT:
         return 'text-gray-800';
       case RunClaudeTaskResponseType.STDERR:
+      case StreamTaskLogsResponseType.STDERR:
         return 'text-red-600';
       case RunClaudeTaskResponseType.STATUS:
+      case StreamTaskLogsResponseType.STATUS:
         return 'text-blue-600';
       case RunClaudeTaskResponseType.ERROR:
+      case StreamTaskLogsResponseType.ERROR:
         return 'text-red-700';
       default:
         return 'text-gray-600';
     }
   };
 
-  const getLogTypeBackground = (type: RunClaudeTaskResponseType) => {
+  const getLogTypeBackground = (type: RunClaudeTaskResponseType | StreamTaskLogsResponseType) => {
+    // Handle both old and new log types
     switch (type) {
       case RunClaudeTaskResponseType.STDOUT:
+      case StreamTaskLogsResponseType.STDOUT:
         return 'bg-white';
       case RunClaudeTaskResponseType.STDERR:
+      case StreamTaskLogsResponseType.STDERR:
         return 'bg-red-50';
       case RunClaudeTaskResponseType.STATUS:
+      case StreamTaskLogsResponseType.STATUS:
         return 'bg-blue-50';
       case RunClaudeTaskResponseType.ERROR:
+      case StreamTaskLogsResponseType.ERROR:
         return 'bg-red-50';
       default:
         return 'bg-gray-50';
     }
   };
 
-  const clearLogs = () => {
-    // This would call the clearLogs function from useTasks
-    console.log('Clear logs');
-  };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full w-full flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
         <div className="flex items-center space-x-4">
@@ -93,47 +86,11 @@ export default function TaskLogs({ sandboxId, taskId, onTaskComplete }: TaskLogs
           )}
         </div>
 
-        <div className="flex items-center space-x-2">
-          {/* Log Filter */}
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value as RunClaudeTaskResponseType | 'all')}
-            className="text-xs border border-gray-300 rounded px-2 py-1"
-          >
-            <option value="all">All Logs</option>
-            <option value={RunClaudeTaskResponseType.STDOUT}>STDOUT</option>
-            <option value={RunClaudeTaskResponseType.STDERR}>STDERR</option>
-            <option value={RunClaudeTaskResponseType.STATUS}>STATUS</option>
-            <option value={RunClaudeTaskResponseType.ERROR}>ERROR</option>
-          </select>
-
-          {/* Auto-scroll Toggle */}
-          <button
-            onClick={() => setAutoScroll(!autoScroll)}
-            className={`text-xs px-2 py-1 rounded border ${
-              autoScroll
-                ? 'bg-blue-100 border-blue-300 text-blue-700'
-                : 'bg-white border-gray-300 text-gray-700'
-            }`}
-          >
-            Auto-scroll
-          </button>
-
-          {/* Clear Button */}
-          <button
-            onClick={clearLogs}
-            className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
-          >
-            Clear
-          </button>
-        </div>
       </div>
 
       {/* Logs Content */}
       <div
-        ref={logsContainerRef}
-        className="flex-1 overflow-y-auto p-4 font-mono text-sm bg-gray-900 text-gray-100"
-        onScroll={handleScroll}
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-auto p-4 font-mono text-sm bg-gray-900 text-gray-100"
       >
         {error && (
           <div className="mb-4 p-3 bg-red-900 border border-red-700 rounded">
@@ -151,32 +108,35 @@ export default function TaskLogs({ sandboxId, taskId, onTaskComplete }: TaskLogs
             <div className="animate-spin w-8 h-8 border-2 border-gray-300 border-t-blue-500 rounded-full mx-auto mb-4"></div>
             <p>Loading existing task logs...</p>
           </div>
-        ) : filteredLogs.length === 0 ? (
+        ) : logs.length === 0 ? (
           <div className="text-center text-gray-500 py-8">
-            {logs.length === 0 ? (
-              <div>
-                <svg className="mx-auto h-8 w-8 text-gray-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <p>No task logs yet</p>
-                <p className="text-sm">Start a task to see logs here</p>
-              </div>
-            ) : (
-              <p>No logs match the current filter</p>
-            )}
+            <div>
+              <svg className="mx-auto h-8 w-8 text-gray-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <p>No task logs yet</p>
+              <p className="text-sm">Start a task to see logs here</p>
+            </div>
           </div>
         ) : (
-          <div className="space-y-1">
-            {filteredLogs.map((log, index) => {
-              const { text, metadata } = parseLogContent(log.content);
+          <div className="space-y-1 max-h-600">
+            {logs.map((log, index) => {
+              // Get the current task description for Claude log formatting
+              const currentTaskInfo = taskHistory.find(task => task.id === currentTask);
+              const taskDescription = currentTaskInfo?.description;
+
+              const { text, metadata } = parseLogContent(log.content, taskDescription);
               return (
                 <div
                   key={index}
-                  className={`flex items-start space-x-3 py-1 px-2 rounded ${
+                  className={`flex items-start space-x-3 py-1 px-2 rounded w-full min-w-0 ${
                     log.type === RunClaudeTaskResponseType.ERROR ||
-                    log.type === RunClaudeTaskResponseType.STDERR
+                    log.type === RunClaudeTaskResponseType.STDERR ||
+                    log.type === StreamTaskLogsResponseType.ERROR ||
+                    log.type === StreamTaskLogsResponseType.STDERR
                       ? 'bg-red-900/20'
-                      : log.type === RunClaudeTaskResponseType.STATUS
+                      : log.type === RunClaudeTaskResponseType.STATUS ||
+                        log.type === StreamTaskLogsResponseType.STATUS
                       ? 'bg-blue-900/20'
                       : ''
                   }`}
@@ -186,19 +146,23 @@ export default function TaskLogs({ sandboxId, taskId, onTaskComplete }: TaskLogs
                   </div>
                   <div className={`flex-shrink-0 text-xs font-medium w-16 ${
                     log.type === RunClaudeTaskResponseType.ERROR ||
-                    log.type === RunClaudeTaskResponseType.STDERR
+                    log.type === RunClaudeTaskResponseType.STDERR ||
+                    log.type === StreamTaskLogsResponseType.ERROR ||
+                    log.type === StreamTaskLogsResponseType.STDERR
                       ? 'text-red-400'
-                      : log.type === RunClaudeTaskResponseType.STATUS
+                      : log.type === RunClaudeTaskResponseType.STATUS ||
+                        log.type === StreamTaskLogsResponseType.STATUS
                       ? 'text-blue-400'
                       : 'text-gray-400'
                   }`}>
                     {formatLogType(log.type)}
                   </div>
-                  <div className="flex-1 whitespace-pre-wrap break-words">
-                    {text}
-                    {log.isFinished && (
+                  <div className="flex-1 min-w-0 break-all overflow-hidden flex-shrink">
+                    <FormattedText text={text} />
+                    {(log.isFinished || log.taskCompleted) && (
                       <div className="mt-1 text-xs text-yellow-400">
-                        Task completed with exit code: {log.exitCode}
+                        Task completed{log.exitCode !== undefined && ` with exit code: ${log.exitCode}`}
+                        {log.taskStatus && ` (Status: ${log.taskStatus})`}
                       </div>
                     )}
                   </div>
@@ -213,8 +177,7 @@ export default function TaskLogs({ sandboxId, taskId, onTaskComplete }: TaskLogs
 
       {/* Status Bar */}
       <div className="px-4 py-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-500">
-        {filteredLogs.length} log{filteredLogs.length !== 1 ? 's' : ''}
-        {filter !== 'all' && ` (${logs.length} total)`}
+        {logs.length} log{logs.length !== 1 ? 's' : ''}
         {isRunning && ' • Task is running'}
       </div>
     </div>

@@ -1,4 +1,5 @@
-import { SandboxType, RunClaudeTaskResponseType } from '@api-client-ts';
+import { SandboxType, RunClaudeTaskResponseType, StreamTaskLogsResponseType } from '@api-client-ts';
+import { formatClaudeOutput, isClaudeJsonOutput } from './claudeLogFormatter';
 
 export function formatTimestamp(timestamp: number | string): string {
   const date = new Date(typeof timestamp === 'string' ? timestamp : timestamp);
@@ -38,15 +39,20 @@ export function formatSandboxType(type: SandboxType): string {
   }
 }
 
-export function formatLogType(type: RunClaudeTaskResponseType): string {
+export function formatLogType(type: RunClaudeTaskResponseType | StreamTaskLogsResponseType): string {
+  // Handle both old and new log types
   switch (type) {
     case RunClaudeTaskResponseType.STDOUT:
+    case StreamTaskLogsResponseType.STDOUT:
       return 'STDOUT';
     case RunClaudeTaskResponseType.STDERR:
+    case StreamTaskLogsResponseType.STDERR:
       return 'STDERR';
     case RunClaudeTaskResponseType.STATUS:
+    case StreamTaskLogsResponseType.STATUS:
       return 'STATUS';
     case RunClaudeTaskResponseType.ERROR:
+    case StreamTaskLogsResponseType.ERROR:
       return 'ERROR';
     default:
       return 'UNKNOWN';
@@ -101,9 +107,22 @@ export function formatDuration(ms: number): string {
   }
 }
 
-export function parseLogContent(content: string): { text: string; metadata?: any } {
+export function parseLogContent(content: string, taskPrompt?: string): { text: string; metadata?: any } {
+  // First check if it's a Claude JSON output that can be formatted
+  if (isClaudeJsonOutput(content)) {
+    const formattedText = formatClaudeOutput(content, taskPrompt);
+    if (formattedText) {
+      try {
+        const parsed = JSON.parse(content);
+        return { text: formattedText, metadata: parsed };
+      } catch {
+        return { text: formattedText };
+      }
+    }
+  }
+
   try {
-    // Try to parse as JSON for structured logs
+    // Try to parse as JSON for other structured logs
     const parsed = JSON.parse(content);
     return { text: parsed.message || content, metadata: parsed };
   } catch {

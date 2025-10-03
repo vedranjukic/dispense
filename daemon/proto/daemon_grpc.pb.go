@@ -167,11 +167,12 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	AgentService_Init_FullMethodName          = "/daemon.AgentService/Init"
-	AgentService_CreateTask_FullMethodName    = "/daemon.AgentService/CreateTask"
-	AgentService_ExecuteClaude_FullMethodName = "/daemon.AgentService/ExecuteClaude"
-	AgentService_GetTaskStatus_FullMethodName = "/daemon.AgentService/GetTaskStatus"
-	AgentService_ListTasks_FullMethodName     = "/daemon.AgentService/ListTasks"
+	AgentService_Init_FullMethodName           = "/daemon.AgentService/Init"
+	AgentService_CreateTask_FullMethodName     = "/daemon.AgentService/CreateTask"
+	AgentService_ExecuteClaude_FullMethodName  = "/daemon.AgentService/ExecuteClaude"
+	AgentService_GetTaskStatus_FullMethodName  = "/daemon.AgentService/GetTaskStatus"
+	AgentService_ListTasks_FullMethodName      = "/daemon.AgentService/ListTasks"
+	AgentService_StreamTaskLogs_FullMethodName = "/daemon.AgentService/StreamTaskLogs"
 )
 
 // AgentServiceClient is the client API for AgentService service.
@@ -185,6 +186,7 @@ type AgentServiceClient interface {
 	ExecuteClaude(ctx context.Context, in *ExecuteClaudeRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecuteClaudeResponse], error)
 	GetTaskStatus(ctx context.Context, in *TaskStatusRequest, opts ...grpc.CallOption) (*TaskStatusResponse, error)
 	ListTasks(ctx context.Context, in *ListTasksRequest, opts ...grpc.CallOption) (*ListTasksResponse, error)
+	StreamTaskLogs(ctx context.Context, in *StreamTaskLogsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamTaskLogsResponse], error)
 }
 
 type agentServiceClient struct {
@@ -254,6 +256,25 @@ func (c *agentServiceClient) ListTasks(ctx context.Context, in *ListTasksRequest
 	return out, nil
 }
 
+func (c *agentServiceClient) StreamTaskLogs(ctx context.Context, in *StreamTaskLogsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamTaskLogsResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &AgentService_ServiceDesc.Streams[1], AgentService_StreamTaskLogs_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StreamTaskLogsRequest, StreamTaskLogsResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type AgentService_StreamTaskLogsClient = grpc.ServerStreamingClient[StreamTaskLogsResponse]
+
 // AgentServiceServer is the server API for AgentService service.
 // All implementations must embed UnimplementedAgentServiceServer
 // for forward compatibility.
@@ -265,6 +286,7 @@ type AgentServiceServer interface {
 	ExecuteClaude(*ExecuteClaudeRequest, grpc.ServerStreamingServer[ExecuteClaudeResponse]) error
 	GetTaskStatus(context.Context, *TaskStatusRequest) (*TaskStatusResponse, error)
 	ListTasks(context.Context, *ListTasksRequest) (*ListTasksResponse, error)
+	StreamTaskLogs(*StreamTaskLogsRequest, grpc.ServerStreamingServer[StreamTaskLogsResponse]) error
 	mustEmbedUnimplementedAgentServiceServer()
 }
 
@@ -289,6 +311,9 @@ func (UnimplementedAgentServiceServer) GetTaskStatus(context.Context, *TaskStatu
 }
 func (UnimplementedAgentServiceServer) ListTasks(context.Context, *ListTasksRequest) (*ListTasksResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListTasks not implemented")
+}
+func (UnimplementedAgentServiceServer) StreamTaskLogs(*StreamTaskLogsRequest, grpc.ServerStreamingServer[StreamTaskLogsResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method StreamTaskLogs not implemented")
 }
 func (UnimplementedAgentServiceServer) mustEmbedUnimplementedAgentServiceServer() {}
 func (UnimplementedAgentServiceServer) testEmbeddedByValue()                      {}
@@ -394,6 +419,17 @@ func _AgentService_ListTasks_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AgentService_StreamTaskLogs_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamTaskLogsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(AgentServiceServer).StreamTaskLogs(m, &grpc.GenericServerStream[StreamTaskLogsRequest, StreamTaskLogsResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type AgentService_StreamTaskLogsServer = grpc.ServerStreamingServer[StreamTaskLogsResponse]
+
 // AgentService_ServiceDesc is the grpc.ServiceDesc for AgentService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -422,6 +458,11 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "ExecuteClaude",
 			Handler:       _AgentService_ExecuteClaude_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "StreamTaskLogs",
+			Handler:       _AgentService_StreamTaskLogs_Handler,
 			ServerStreams: true,
 		},
 	},

@@ -5,13 +5,19 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
+	"strings"
 	"time"
 
 	pb "cli/internal/grpc/proto"
+	daemonpb "cli/proto"
 	"cli/internal/services"
 	"cli/internal/core/models"
 	"cli/internal/core/errors"
+	"cli/pkg/config"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -20,6 +26,7 @@ type DispenseServer struct {
 	pb.UnimplementedDispenseServiceServer
 	ServiceContainer *services.ServiceContainer
 	Logger           *log.Logger
+	configService    *config.Service
 }
 
 // NewDispenseServer creates a new gRPC server instance
@@ -27,6 +34,7 @@ func NewDispenseServer(serviceContainer *services.ServiceContainer) *DispenseSer
 	return &DispenseServer{
 		ServiceContainer: serviceContainer,
 		Logger:           log.New(os.Stdout, "[grpc-server] ", log.LstdFlags),
+		configService:    config.NewService(),
 	}
 }
 
@@ -273,19 +281,99 @@ func (s *DispenseServer) GetClaudeLogs(ctx context.Context, req *pb.GetClaudeLog
 	}, nil
 }
 
+// StreamTaskLogs streams logs for a specific task in real-time
+func (s *DispenseServer) StreamTaskLogs(req *pb.StreamTaskLogsRequest, stream pb.DispenseService_StreamTaskLogsServer) error {
+	s.Logger.Printf("StreamTaskLogs called for task: %s in sandbox: %s", req.TaskId, req.SandboxIdentifier)
+
+	// Get sandbox info using the provided sandbox identifier
+	sandboxInfo, err := s.ServiceContainer.SandboxService.FindByName(req.SandboxIdentifier)
+	if err != nil {
+		s.Logger.Printf("Failed to find sandbox %s: %v", req.SandboxIdentifier, err)
+		return stream.Send(&pb.StreamTaskLogsResponse{
+			Type:      pb.StreamTaskLogsResponse_ERROR,
+			Content:   fmt.Sprintf("Failed to find sandbox: %v", err),
+			Timestamp: time.Now().Unix(),
+		})
+	}
+
+	// Connect directly to the daemon for this sandbox
+	daemonConn, err := s.connectToDaemon(sandboxInfo)
+	if err != nil {
+		s.Logger.Printf("Failed to connect to daemon: %v", err)
+		return stream.Send(&pb.StreamTaskLogsResponse{
+			Type:      pb.StreamTaskLogsResponse_ERROR,
+			Content:   fmt.Sprintf("Failed to connect to daemon: %v", err),
+			Timestamp: time.Now().Unix(),
+		})
+	}
+	defer daemonConn.Close()
+
+	// Create daemon client and forward the streaming request
+	daemonClient := daemonpb.NewAgentServiceClient(daemonConn)
+
+	// Create daemon request (need to import daemon proto package)
+	daemonReq := &daemonpb.StreamTaskLogsRequest{
+		TaskId:         req.TaskId,
+		Follow:         req.Follow,
+		IncludeHistory: req.IncludeHistory,
+		FromTimestamp:  req.FromTimestamp,
+	}
+
+	// Call daemon streaming method
+	daemonStream, err := daemonClient.StreamTaskLogs(stream.Context(), daemonReq)
+	if err != nil {
+		s.Logger.Printf("Failed to start daemon stream: %v", err)
+		return stream.Send(&pb.StreamTaskLogsResponse{
+			Type:      pb.StreamTaskLogsResponse_ERROR,
+			Content:   fmt.Sprintf("Failed to start daemon stream: %v", err),
+			Timestamp: time.Now().Unix(),
+		})
+	}
+
+	// Forward all responses from daemon to client
+	for {
+		daemonResp, err := daemonStream.Recv()
+		if err != nil {
+			if err.Error() == "EOF" {
+				s.Logger.Printf("Daemon stream completed for task %s", req.TaskId)
+				return nil
+			}
+			s.Logger.Printf("Daemon stream error: %v", err)
+			return stream.Send(&pb.StreamTaskLogsResponse{
+				Type:      pb.StreamTaskLogsResponse_ERROR,
+				Content:   fmt.Sprintf("Daemon stream error: %v", err),
+				Timestamp: time.Now().Unix(),
+			})
+		}
+
+		// Convert daemon response to dispense response format
+		dispenseResp := &pb.StreamTaskLogsResponse{
+			Type:          pb.StreamTaskLogsResponse_LogType(daemonResp.Type),
+			Content:       daemonResp.Content,
+			Timestamp:     daemonResp.Timestamp,
+			TaskCompleted: daemonResp.TaskCompleted,
+			TaskStatus:    daemonResp.TaskStatus,
+		}
+
+		// Forward to client
+		if err := stream.Send(dispenseResp); err != nil {
+			s.Logger.Printf("Failed to send response to client: %v", err)
+			return err
+		}
+
+		// If task is completed, we're done
+		if daemonResp.TaskCompleted {
+			s.Logger.Printf("Task %s completed, ending stream", req.TaskId)
+			return nil
+		}
+	}
+}
+
 // GetAPIKey gets the API key
 func (s *DispenseServer) GetAPIKey(ctx context.Context, req *pb.GetAPIKeyRequest) (*pb.GetAPIKeyResponse, error) {
 	s.Logger.Printf("GetAPIKey called")
 
-	var apiKey string
-	var err error
-
-	if req.Interactive {
-		apiKey, err = s.ServiceContainer.ConfigManager.GetOrPromptAPIKey()
-	} else {
-		apiKey, err = s.ServiceContainer.ConfigManager.LoadAPIKeyNonInteractive()
-	}
-
+	apiKey, err := s.configService.GetDaytonaAPIKey(req.Interactive)
 	if err != nil {
 		s.Logger.Printf("Failed to get API key: %v", err)
 		return &pb.GetAPIKeyResponse{
@@ -302,7 +390,7 @@ func (s *DispenseServer) GetAPIKey(ctx context.Context, req *pb.GetAPIKeyRequest
 func (s *DispenseServer) SetAPIKey(ctx context.Context, req *pb.SetAPIKeyRequest) (*pb.SetAPIKeyResponse, error) {
 	s.Logger.Printf("SetAPIKey called")
 
-	err := s.ServiceContainer.ConfigManager.SaveAPIKey(req.ApiKey)
+	err := s.configService.SetDaytonaAPIKey(req.ApiKey)
 	if err != nil {
 		s.Logger.Printf("Failed to set API key: %v", err)
 		return &pb.SetAPIKeyResponse{
@@ -321,14 +409,7 @@ func (s *DispenseServer) SetAPIKey(ctx context.Context, req *pb.SetAPIKeyRequest
 func (s *DispenseServer) ValidateAPIKey(ctx context.Context, req *pb.ValidateAPIKeyRequest) (*pb.ValidateAPIKeyResponse, error) {
 	s.Logger.Printf("ValidateAPIKey called")
 
-	// For now, this is a basic validation
-	// In a real implementation, this would make an API call to validate the key
-	valid := req.ApiKey != "" && len(req.ApiKey) > 10
-
-	message := "API key is valid"
-	if !valid {
-		message = "API key is invalid"
-	}
+	valid, message := s.configService.ValidateDaytonaAPIKey(req.ApiKey)
 
 	return &pb.ValidateAPIKeyResponse{
 		Valid:   valid,
@@ -457,4 +538,170 @@ func (s *DispenseServer) convertError(err error) *pb.ErrorResponse {
 		Message: err.Error(),
 		Details: make(map[string]string),
 	}
+}
+
+// findSandboxForTask finds which sandbox a task belongs to
+// This is a simplified implementation - in production you might want to store task-to-sandbox mapping
+func (s *DispenseServer) findSandboxForTask(taskID string) (string, error) {
+	// For now, we'll search through all active sandboxes to find one that has this task
+	// This is not very efficient but works for the MVP
+
+	// List all sandboxes
+	sandboxes, err := s.ServiceContainer.SandboxService.List(&models.SandboxListOptions{
+		ShowLocal:  true,
+		ShowRemote: true,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to list sandboxes: %w", err)
+	}
+
+	// Try each sandbox to see if it has this task
+	for _, sandbox := range sandboxes {
+		if s.sandboxHasTask(sandbox, taskID) {
+			return sandbox.Name, nil
+		}
+	}
+
+	return "", fmt.Errorf("task %s not found in any active sandbox", taskID)
+}
+
+// sandboxHasTask checks if a sandbox has a specific task
+func (s *DispenseServer) sandboxHasTask(sandbox *models.SandboxInfo, taskID string) bool {
+	// Try to connect to the sandbox's daemon and check if it has this task
+	daemonConn, err := s.connectToDaemon(sandbox)
+	if err != nil {
+		// If we can't connect, assume this sandbox doesn't have the task
+		return false
+	}
+	defer daemonConn.Close()
+
+	// Create daemon client and check for task
+	daemonClient := daemonpb.NewAgentServiceClient(daemonConn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Try to get task status - if it exists, this sandbox has the task
+	_, err = daemonClient.GetTaskStatus(ctx, &daemonpb.TaskStatusRequest{
+		TaskId: taskID,
+	})
+
+	// If no error, the task exists in this sandbox
+	return err == nil
+}
+
+// connectToDaemon connects to a sandbox's daemon using the same logic as ClaudeService
+func (s *DispenseServer) connectToDaemon(sandbox *models.SandboxInfo) (*grpc.ClientConn, error) {
+	// Use the same logic as ClaudeService.getDaemonAddress
+	var daemonAddr string
+
+	if sandbox.Type == models.TypeLocal {
+		// For local sandboxes, get the container IP and use port 28080
+		containerIP, err := s.getSandboxContainerIP(sandbox)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get container IP: %w", err)
+		}
+		daemonAddr = fmt.Sprintf("%s:28080", containerIP)
+	} else {
+		// For remote sandboxes, use SSH port forwarding through provider
+		return nil, fmt.Errorf("remote sandbox daemon connection not yet implemented")
+	}
+
+	// Connect to daemon
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, daemonAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to daemon at %s: %w", daemonAddr, err)
+	}
+
+	return conn, nil
+}
+
+// getSandboxContainerIP gets the IP address of a sandbox container (simplified version)
+func (s *DispenseServer) getSandboxContainerIP(sandbox *models.SandboxInfo) (string, error) {
+	// Get container name from metadata
+	containerName, exists := sandbox.Metadata["container_name"]
+	if !exists {
+		return "", fmt.Errorf("container_name not found in sandbox metadata")
+	}
+
+	containerNameStr := fmt.Sprintf("%v", containerName)
+
+	// Get the IP address of the container
+	cmd := exec.Command("docker", "inspect", containerNameStr, "--format", "{{.NetworkSettings.IPAddress}}")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get IP address for container %s: %w", containerNameStr, err)
+	}
+
+	ip := strings.TrimSpace(string(output))
+	if ip == "" {
+		return "", fmt.Errorf("no IP address found for container %s", containerNameStr)
+	}
+
+	return ip, nil
+}
+
+// CreateClaudeTask creates a new Claude task and returns the task ID
+func (s *DispenseServer) CreateClaudeTask(ctx context.Context, req *pb.CreateClaudeTaskRequest) (*pb.CreateClaudeTaskResponse, error) {
+	s.Logger.Printf("CreateClaudeTask called for sandbox: %s", req.SandboxIdentifier)
+
+	// Get sandbox info using the provided sandbox identifier
+	sandboxInfo, err := s.ServiceContainer.SandboxService.FindByName(req.SandboxIdentifier)
+	if err != nil {
+		s.Logger.Printf("Failed to find sandbox %s: %v", req.SandboxIdentifier, err)
+		return &pb.CreateClaudeTaskResponse{
+			Error: s.convertError(err),
+		}, nil
+	}
+
+	// Connect to the daemon
+	daemonConn, err := s.connectToDaemon(sandboxInfo)
+	if err != nil {
+		s.Logger.Printf("Failed to connect to daemon: %v", err)
+		return &pb.CreateClaudeTaskResponse{
+			Error: s.convertError(err),
+		}, nil
+	}
+	defer daemonConn.Close()
+
+	// Create daemon client and forward the request
+	daemonClient := daemonpb.NewAgentServiceClient(daemonConn)
+
+	// Create daemon request - let daemon handle API key loading
+	daemonReq := &daemonpb.CreateTaskRequest{
+		Prompt:           req.TaskDescription,
+		WorkingDirectory: req.WorkingDirectory,
+		EnvironmentVars:  req.EnvironmentVars,
+		AnthropicApiKey:  req.AnthropicApiKey, // Pass through if provided, let daemon load if empty
+		Model:            req.Model,
+	}
+
+	// Call daemon CreateTask method
+	daemonResp, err := daemonClient.CreateTask(ctx, daemonReq)
+	if err != nil {
+		s.Logger.Printf("Daemon CreateTask failed: %v", err)
+		return &pb.CreateClaudeTaskResponse{
+			Error: s.convertError(err),
+		}, nil
+	}
+
+	if !daemonResp.Success {
+		s.Logger.Printf("Daemon CreateTask returned failure: %s", daemonResp.Message)
+		return &pb.CreateClaudeTaskResponse{
+			Success: false,
+			Message: daemonResp.Message,
+		}, nil
+	}
+
+	return &pb.CreateClaudeTaskResponse{
+		Success: true,
+		TaskId:  daemonResp.TaskId,
+		Message: daemonResp.Message,
+	}, nil
 }

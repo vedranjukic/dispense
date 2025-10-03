@@ -44,6 +44,12 @@ service DispenseService {
   };
 
   // Claude operations
+  rpc CreateClaudeTask(CreateClaudeTaskRequest) returns (CreateClaudeTaskResponse) {
+    option (google.api.http) = {
+      post: "/v1/sandboxes/{sandbox_identifier}/tasks"
+      body: "*"
+    };
+  };
   rpc RunClaudeTask(RunClaudeTaskRequest) returns (stream RunClaudeTaskResponse) {
     option (google.api.http) = {
       post: "/v1/claude/tasks"
@@ -63,6 +69,11 @@ service DispenseService {
   rpc ListClaudeTasks(ListClaudeTasksRequest) returns (ListClaudeTasksResponse) {
     option (google.api.http) = {
       get: "/v1/claude/{sandbox_identifier}/tasks"
+    };
+  };
+  rpc StreamTaskLogs(StreamTaskLogsRequest) returns (stream StreamTaskLogsResponse) {
+    option (google.api.http) = {
+      get: "/v1/sandboxes/{sandbox_identifier}/tasks/{task_id}/logs/stream"
     };
   };
 
@@ -164,6 +175,22 @@ message GetProjectSourcesResponse {
 }
 
 // Claude service messages
+message CreateClaudeTaskRequest {
+  string sandbox_identifier = 1;
+  string task_description = 2;
+  string model = 3;
+  string working_directory = 4;
+  map<string, string> environment_vars = 5;
+  string anthropic_api_key = 6;
+}
+
+message CreateClaudeTaskResponse {
+  bool success = 1;
+  string task_id = 2;
+  string message = 3;
+  ErrorResponse error = 4;
+}
+
 message RunClaudeTaskRequest {
   string sandbox_identifier = 1;
   string task_description = 2;
@@ -225,6 +252,30 @@ message ListClaudeTasksResponse {
   bool success = 1;
   repeated TaskInfo tasks = 2;
   ErrorResponse error = 3;
+}
+
+// StreamTaskLogs service messages
+message StreamTaskLogsRequest {
+  string task_id = 1;
+  string sandbox_identifier = 2;  // Sandbox identifier to route the request
+  bool follow = 3;           // Follow mode - stream until task completes
+  bool include_history = 4;  // Include existing logs before streaming
+  int64 from_timestamp = 5;  // Start from specific timestamp (optional)
+}
+
+message StreamTaskLogsResponse {
+  enum LogType {
+    STDOUT = 0;
+    STDERR = 1;
+    STATUS = 2;
+    ERROR = 3;
+  }
+
+  LogType type = 1;
+  string content = 2;
+  int64 timestamp = 3;
+  bool task_completed = 4; // Indicates if task finished
+  string task_status = 5;  // RUNNING, COMPLETED, FAILED
 }
 
 // Config service messages

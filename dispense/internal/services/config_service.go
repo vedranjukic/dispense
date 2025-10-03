@@ -40,3 +40,8 @@ func (c *ConfigManager) LoadAPIKeyNonInteractive() (string, error) {
 func (c *ConfigManager) PromptForAPIKey() (string, error) {
 	return c.manager.PromptForAPIKey()
 }
+
+// LoadAnthropicAPIKey loads the Anthropic API key from environment variable or Claude config
+func (c *ConfigManager) LoadAnthropicAPIKey() (string, error) {
+	return c.manager.LoadAnthropicAPIKey()
+}

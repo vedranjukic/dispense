@@ -158,3 +158,37 @@ func (m *Manager) GetOrPromptAPIKey() (string, error) {
 func (m *Manager) LoadAPIKeyNonInteractive() (string, error) {
 	return m.LoadAPIKey()
 }
+
+// LoadAnthropicAPIKey loads the Anthropic API key from environment variable or Claude config
+func (m *Manager) LoadAnthropicAPIKey() (string, error) {
+	// First try environment variable
+	if apiKey := os.Getenv("ANTHROPIC_API_KEY"); apiKey != "" {
+		return apiKey, nil
+	}
+
+	// Try app-specific config
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", errors.Wrap(err, errors.ErrCodeConfigInvalid, "failed to get home directory")
+	}
+
+	// Try reading from Claude config file
+	claudeConfigPath := filepath.Join(homeDir, ".claude", "config.toml")
+	if content, err := os.ReadFile(claudeConfigPath); err == nil {
+		lines := strings.Split(string(content), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "api_key") && strings.Contains(line, "=") {
+				parts := strings.SplitN(line, "=", 2)
+				if len(parts) == 2 {
+					apiKey := strings.TrimSpace(strings.Trim(parts[1], `"`))
+					if apiKey != "" {
+						return apiKey, nil
+					}
+				}
+			}
+		}
+	}
+
+	return "", errors.New(errors.ErrCodeAPIKeyMissing, "ANTHROPIC_API_KEY not found in environment variable or Claude config")
+}

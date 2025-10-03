@@ -1,4 +1,12 @@
-import { DispenseClient, SandboxInfo, RunClaudeTaskResponse } from '@api-client-ts';
+import {
+  DispenseClient,
+  SandboxInfo,
+  RunClaudeTaskResponse,
+  StreamTaskLogsResponse,
+  StreamTaskLogsRequest,
+  CreateClaudeTaskRequest,
+  CreateClaudeTaskResponse
+} from '@api-client-ts';
 import { FileItem } from '../types/file';
 
 export class DashboardAPIService {
@@ -68,7 +76,7 @@ export class DashboardAPIService {
     }
   }
 
-  // Task operations
+  // Task operations - Legacy streaming method (keep for backward compatibility)
   async runTask(
     sandboxId: string,
     description: string,
@@ -78,6 +86,73 @@ export class DashboardAPIService {
       sandbox_identifier: sandboxId,
       task_description: description
     }, onMessage);
+  }
+
+  // New task creation method that returns task ID
+  async createTask(
+    sandboxId: string,
+    description: string,
+    model?: string
+  ): Promise<string> {
+    console.log('Creating task with API:', { sandboxId, description, model });
+
+    const response = await this.client.createClaudeTask({
+      sandbox_identifier: sandboxId,
+      task_description: description,
+      model
+    });
+
+    console.log('Create task API response:', response);
+
+    if (response.error) {
+      console.error('Create task error:', response.error);
+      throw new Error(`Failed to create task: ${response.error.message}`);
+    }
+
+    if (!response.success || !response.task_id) {
+      console.error('Create task failed:', response);
+      throw new Error(`Failed to create task: ${response.message || 'Unknown error'}`);
+    }
+
+    console.log('Task created successfully with ID:', response.task_id);
+    return response.task_id;
+  }
+
+  // New streaming logs method
+  async streamTaskLogs(
+    request: StreamTaskLogsRequest,
+    onMessage?: (response: StreamTaskLogsResponse) => void,
+    onComplete?: (taskStatus: string) => void,
+    onError?: (error: Error) => void
+  ): Promise<void> {
+    console.log('Starting stream task logs with request:', request);
+
+    const wrappedOnMessage = onMessage ? (response: StreamTaskLogsResponse) => {
+      console.log('Stream message received:', response);
+      onMessage(response);
+    } : undefined;
+
+    const wrappedOnComplete = onComplete ? (taskStatus: string) => {
+      console.log('Stream completed with status:', taskStatus);
+      onComplete(taskStatus);
+    } : undefined;
+
+    const wrappedOnError = onError ? (error: Error) => {
+      console.error('Stream error:', error);
+      onError(error);
+    } : undefined;
+
+    try {
+      await this.client.streamTaskLogs(request, wrappedOnMessage, wrappedOnComplete, wrappedOnError);
+      console.log('Stream task logs call completed');
+    } catch (error) {
+      console.error('Stream task logs failed:', error);
+      if (wrappedOnError) {
+        wrappedOnError(error instanceof Error ? error : new Error('Unknown streaming error'));
+      } else {
+        throw error;
+      }
+    }
   }
 
   async getClaudeStatus(sandboxId: string) {

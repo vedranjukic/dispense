@@ -28,6 +28,7 @@ type ConfigManagerInterface interface {
 	GetOrPromptAPIKey() (string, error)
 	LoadAPIKeyNonInteractive() (string, error)
 	PromptForAPIKey() (string, error)
+	LoadAnthropicAPIKey() (string, error)
 }
 
 // ServiceContainer holds all services for dependency injection

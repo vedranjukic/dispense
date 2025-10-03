@@ -17,6 +17,7 @@ service AgentService {
   rpc ExecuteClaude(ExecuteClaudeRequest) returns (stream ExecuteClaudeResponse);
   rpc GetTaskStatus(TaskStatusRequest) returns (TaskStatusResponse);
   rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
+  rpc StreamTaskLogs(StreamTaskLogsRequest) returns (stream StreamTaskLogsResponse);
 }
 
 // Common request/response types
@@ -123,4 +124,28 @@ message TaskInfo {
 // ListTasksResponse returns list of tasks
 message ListTasksResponse {
   repeated TaskInfo tasks = 1;
+}
+
+// StreamTaskLogsRequest for streaming task logs
+message StreamTaskLogsRequest {
+  string task_id = 1;
+  bool follow = 2;           // Follow mode - stream until task completes
+  bool include_history = 3;  // Include existing logs before streaming
+  int64 from_timestamp = 4;  // Start from specific timestamp (optional)
+}
+
+// StreamTaskLogsResponse streams task log entries
+message StreamTaskLogsResponse {
+  enum LogType {
+    STDOUT = 0;
+    STDERR = 1;
+    STATUS = 2;
+    ERROR = 3;
+  }
+
+  LogType type = 1;
+  string content = 2;
+  int64 timestamp = 3;
+  bool task_completed = 4; // Indicates if task finished
+  string task_status = 5;  // RUNNING, COMPLETED, FAILED
 }

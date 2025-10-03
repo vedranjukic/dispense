@@ -3,9 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +13,7 @@ import (
 	"cli/pkg/sandbox"
 	"cli/pkg/sandbox/local"
 	"cli/pkg/sandbox/remote"
+	"cli/pkg/utils"
 	pb "cli/proto"
 
 	"google.golang.org/grpc"
@@ -42,7 +41,7 @@ func (s *ClaudeService) RunTask(req *models.ClaudeTaskRequest) (*models.ClaudeTa
 	}
 
 	// Get API key (fetch fresh each time as it can change)
-	apiKey, err := s.getAnthropicAPIKey()
+	apiKey, err := utils.GetAnthropicAPIKey()
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeAPIKeyMissing, "failed to get Anthropic API key")
 	}
@@ -306,67 +305,6 @@ func (s *ClaudeService) getWorkingDirectoryFromProvider(sandboxInfo *models.Sand
 		// since local sandboxes always use /workspace
 		return "/workspace", nil
 	}
-}
-
-// getAnthropicAPIKey retrieves the Anthropic API key from various sources
-func (s *ClaudeService) getAnthropicAPIKey() (string, error) {
-	// First try environment variable
-	if apiKey := os.Getenv("ANTHROPIC_API_KEY"); apiKey != "" {
-		return apiKey, nil
-	}
-
-	// Try app-specific config first
-	if apiKey, err := s.loadAppSpecificClaudeAPIKey(); err == nil && apiKey != "" {
-		return apiKey, nil
-	}
-
-	// Try to read from Claude config
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	// Try reading from Claude config file
-	claudeConfigPath := filepath.Join(homeDir, ".claude", "config.toml")
-	if content, err := os.ReadFile(claudeConfigPath); err == nil {
-		lines := strings.Split(string(content), "\n")
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "api_key") && strings.Contains(line, "=") {
-				parts := strings.SplitN(line, "=", 2)
-				if len(parts) == 2 {
-					apiKey := strings.TrimSpace(strings.Trim(parts[1], `"`))
-					if apiKey != "" {
-						return apiKey, nil
-					}
-				}
-			}
-		}
-	}
-
-	return "", fmt.Errorf("no Anthropic API key found. Please set ANTHROPIC_API_KEY environment variable or configure Claude CLI")
-}
-
-// loadAppSpecificClaudeAPIKey tries to load API key from app-specific config
-func (s *ClaudeService) loadAppSpecificClaudeAPIKey() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-
-	configPath := filepath.Join(homeDir, ".dispense", "claude", "config")
-	content, err := os.ReadFile(configPath)
-	if err != nil {
-		return "", err
-	}
-
-	// Just return the trimmed content as the API key
-	apiKey := strings.TrimSpace(string(content))
-	if apiKey == "" {
-		return "", fmt.Errorf("API key not found in app-specific config")
-	}
-
-	return apiKey, nil
 }
 
 // ListTasks retrieves all tasks for the specified sandbox

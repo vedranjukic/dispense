@@ -668,3 +668,211 @@ func (tm *TaskManager) ListTasks(stateFilter *proto.TaskStatusResponse_TaskState
 
 	return tasks, nil
 }
+
+// StreamTaskLogs streams logs for a specific task with real-time follow capability
+func (tm *TaskManager) StreamTaskLogs(req *proto.StreamTaskLogsRequest, stream proto.AgentService_StreamTaskLogsServer, status *proto.TaskStatusResponse) error {
+	tm.mutex.RLock()
+	task, exists := tm.tasks[req.TaskId]
+	tm.mutex.RUnlock()
+
+	if !exists {
+		return fmt.Errorf("task not found: %s", req.TaskId)
+	}
+
+	// Get log file path
+	logFilePath := ""
+	if task.LogFile != nil {
+		logFilePath = task.LogFile.Name()
+	} else {
+		// Construct log file path if LogFile is nil
+		logFileName := fmt.Sprintf("%s.log", req.TaskId)
+		logFilePath = filepath.Join(tm.logDir, logFileName)
+	}
+
+	// Check if log file exists
+	if _, err := os.Stat(logFilePath); os.IsNotExist(err) {
+		return fmt.Errorf("log file not found for task: %s", req.TaskId)
+	}
+
+	// If include_history is true, send existing log entries first
+	if req.IncludeHistory {
+		if err := tm.sendExistingLogs(req, stream, logFilePath); err != nil {
+			return fmt.Errorf("failed to send existing logs: %w", err)
+		}
+	}
+
+	// If follow is false or task is completed, we're done
+	if !req.Follow || (status.State != proto.TaskStatusResponse_RUNNING) {
+		// Send final status
+		return stream.Send(&proto.StreamTaskLogsResponse{
+			Type:          proto.StreamTaskLogsResponse_STATUS,
+			Content:       status.Message,
+			Timestamp:     time.Now().Unix(),
+			TaskCompleted: status.State != proto.TaskStatusResponse_RUNNING,
+			TaskStatus:    tm.getTaskStatusString(status.State),
+		})
+	}
+
+	// Follow mode: monitor log file for new entries
+	return tm.followLogFile(req, stream, logFilePath)
+}
+
+// sendExistingLogs sends existing log entries from the log file
+func (tm *TaskManager) sendExistingLogs(req *proto.StreamTaskLogsRequest, stream proto.AgentService_StreamTaskLogsServer, logFilePath string) error {
+	content, err := os.ReadFile(logFilePath)
+	if err != nil {
+		return err
+	}
+
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		// Parse timestamp from log entry if available
+		timestamp := time.Now().Unix()
+		if parts := strings.SplitN(line, "]", 2); len(parts) >= 2 {
+			if timeStr := strings.Trim(parts[0], "["); timeStr != "" {
+				if parsedTime, err := time.Parse(time.RFC3339, timeStr); err == nil {
+					// Apply from_timestamp filter if specified
+					if req.FromTimestamp > 0 && parsedTime.Unix() < req.FromTimestamp {
+						continue
+					}
+					timestamp = parsedTime.Unix()
+				}
+			}
+		}
+
+		// Determine log type based on content
+		logType := tm.parseLogType(line)
+
+		if err := stream.Send(&proto.StreamTaskLogsResponse{
+			Type:      logType,
+			Content:   line,
+			Timestamp: timestamp,
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// followLogFile follows a log file for new entries in real-time
+func (tm *TaskManager) followLogFile(req *proto.StreamTaskLogsRequest, stream proto.AgentService_StreamTaskLogsServer, logFilePath string) error {
+	// Open the log file
+	file, err := os.Open(logFilePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Seek to end of file to only read new content
+	if _, err := file.Seek(0, io.SeekEnd); err != nil {
+		return err
+	}
+
+	reader := bufio.NewReader(file)
+
+	// Polling loop to check for new content and task status
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-stream.Context().Done():
+			return stream.Context().Err()
+
+		case <-ticker.C:
+			// Check if task is still running
+			tm.mutex.RLock()
+			task, exists := tm.tasks[req.TaskId]
+			tm.mutex.RUnlock()
+
+			if !exists {
+				return fmt.Errorf("task disappeared during streaming")
+			}
+
+			// Read any new lines from the file
+			for {
+				line, _, err := reader.ReadLine()
+				if err == io.EOF {
+					break // No more data available
+				}
+				if err != nil {
+					return fmt.Errorf("error reading log file: %w", err)
+				}
+
+				lineStr := string(line)
+				if strings.TrimSpace(lineStr) == "" {
+					continue
+				}
+
+				// Parse timestamp from log entry
+				timestamp := time.Now().Unix()
+				if parts := strings.SplitN(lineStr, "]", 2); len(parts) >= 2 {
+					if timeStr := strings.Trim(parts[0], "["); timeStr != "" {
+						if parsedTime, err := time.Parse(time.RFC3339, timeStr); err == nil {
+							timestamp = parsedTime.Unix()
+						}
+					}
+				}
+
+				// Determine log type
+				logType := tm.parseLogType(lineStr)
+
+				// Send the log entry
+				if err := stream.Send(&proto.StreamTaskLogsResponse{
+					Type:      logType,
+					Content:   lineStr,
+					Timestamp: timestamp,
+				}); err != nil {
+					return err
+				}
+			}
+
+			// Check if task has completed
+			if task.State != proto.TaskStatusResponse_RUNNING {
+				// Send final status and complete the stream
+				return stream.Send(&proto.StreamTaskLogsResponse{
+					Type:          proto.StreamTaskLogsResponse_STATUS,
+					Content:       tm.getTaskStatusString(task.State) + " - streaming complete",
+					Timestamp:     time.Now().Unix(),
+					TaskCompleted: true,
+					TaskStatus:    tm.getTaskStatusString(task.State),
+				})
+			}
+		}
+	}
+}
+
+// parseLogType determines the log type based on log content
+func (tm *TaskManager) parseLogType(line string) proto.StreamTaskLogsResponse_LogType {
+	if strings.Contains(line, "[ERROR]") {
+		return proto.StreamTaskLogsResponse_ERROR
+	}
+	if strings.Contains(line, "[STATUS]") {
+		return proto.StreamTaskLogsResponse_STATUS
+	}
+	if strings.Contains(line, "[STDERR]") {
+		return proto.StreamTaskLogsResponse_STDERR
+	}
+	return proto.StreamTaskLogsResponse_STDOUT
+}
+
+// getTaskStatusString converts task state to string
+func (tm *TaskManager) getTaskStatusString(state proto.TaskStatusResponse_TaskState) string {
+	switch state {
+	case proto.TaskStatusResponse_RUNNING:
+		return "RUNNING"
+	case proto.TaskStatusResponse_COMPLETED:
+		return "COMPLETED"
+	case proto.TaskStatusResponse_FAILED:
+		return "FAILED"
+	case proto.TaskStatusResponse_PENDING:
+		return "PENDING"
+	default:
+		return "UNKNOWN"
+	}
+}

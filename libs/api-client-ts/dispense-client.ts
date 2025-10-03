@@ -126,6 +126,22 @@ export interface WaitForSandboxResponse {
   error?: ErrorResponse;
 }
 
+export interface CreateClaudeTaskRequest {
+  sandbox_identifier: string;
+  task_description: string;
+  model?: string;
+  working_directory?: string;
+  environment_vars?: { [key: string]: string };
+  anthropic_api_key?: string;
+}
+
+export interface CreateClaudeTaskResponse {
+  success: boolean;
+  task_id?: string;
+  message?: string;
+  error?: ErrorResponse;
+}
+
 export interface RunClaudeTaskRequest {
   sandbox_identifier: string;
   task_description: string;
@@ -167,6 +183,30 @@ export interface GetClaudeLogsResponse {
   success: boolean;
   logs: string[];
   error?: ErrorResponse;
+}
+
+// Streaming task logs types
+export enum StreamTaskLogsResponseType {
+  STDOUT = 0,
+  STDERR = 1,
+  STATUS = 2,
+  ERROR = 3
+}
+
+export interface StreamTaskLogsRequest {
+  task_id: string;
+  sandbox_identifier: string;
+  follow?: boolean;
+  include_history?: boolean;
+  from_timestamp?: number;
+}
+
+export interface StreamTaskLogsResponse {
+  type: StreamTaskLogsResponseType;
+  content: string;
+  timestamp: number;
+  task_completed?: boolean;
+  task_status?: string;
 }
 
 export interface GetAPIKeyRequest {
@@ -332,6 +372,14 @@ export class DispenseClient {
   }
 
   // Claude operations
+  async createClaudeTask(request: CreateClaudeTaskRequest): Promise<CreateClaudeTaskResponse> {
+    return this.request<CreateClaudeTaskResponse>(
+      'POST',
+      `/v1/sandboxes/${encodeURIComponent(request.sandbox_identifier)}/tasks`,
+      request
+    );
+  }
+
   async runClaudeTask(
     request: RunClaudeTaskRequest,
     onMessage?: (response: RunClaudeTaskResponse) => void
@@ -389,6 +437,80 @@ export class DispenseClient {
       'GET',
       `/v1/claude/${encodeURIComponent(sandbox_identifier)}/logs${query ? '?' + query : ''}`
     );
+  }
+
+  // Stream task logs with real-time updates
+  async streamTaskLogs(
+    request: StreamTaskLogsRequest,
+    onMessage?: (response: StreamTaskLogsResponse) => void,
+    onComplete?: (taskStatus: string) => void,
+    onError?: (error: Error) => void
+  ): Promise<void> {
+    try {
+      const searchParams = new URLSearchParams();
+      if (request.follow !== undefined) searchParams.set('follow', request.follow.toString());
+      if (request.include_history !== undefined) searchParams.set('include_history', request.include_history.toString());
+      if (request.from_timestamp !== undefined) searchParams.set('from_timestamp', request.from_timestamp.toString());
+
+      const query = searchParams.toString();
+      const response = await this.request<Response>(
+        'GET',
+        `/v1/sandboxes/${encodeURIComponent(request.sandbox_identifier)}/tasks/${encodeURIComponent(request.task_id)}/logs/stream${query ? '?' + query : ''}`,
+        undefined,
+        { stream: true }
+      );
+
+      if (!response.body) {
+        throw new Error('No response body for streaming request');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ') && line.length > 6) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                const logResponse = data as StreamTaskLogsResponse;
+
+                if (onMessage) {
+                  onMessage(logResponse);
+                }
+
+                // Check if task is completed
+                if (logResponse.task_completed) {
+                  if (onComplete && logResponse.task_status) {
+                    onComplete(logResponse.task_status);
+                  }
+                  return;
+                }
+              } catch (error) {
+                console.warn('Failed to parse SSE data:', error);
+                if (onError) {
+                  onError(new Error(`Failed to parse streaming data: ${error}`));
+                }
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    } catch (error) {
+      if (onError) {
+        onError(error instanceof Error ? error : new Error(String(error)));
+      } else {
+        throw error;
+      }
+    }
   }
 
   // Configuration management
@@ -459,6 +581,37 @@ await client.runClaudeTask({
   if (response.is_finished) {
     console.log('Task completed with exit code:', response.exit_code);
   }
+});
+
+// Stream task logs in real-time (new streaming functionality)
+await client.streamTaskLogs({
+  task_id: 'claude_1234567890',
+  sandbox_identifier: 'my-sandbox',
+  follow: true,
+  include_history: true
+},
+// onMessage callback
+(logResponse) => {
+  console.log(`[${logResponse.type}] ${logResponse.content}`);
+},
+// onComplete callback
+(taskStatus) => {
+  console.log(`Task completed with status: ${taskStatus}`);
+},
+// onError callback
+(error) => {
+  console.error('Streaming error:', error.message);
+});
+
+// Stream task logs without following (get historical logs only)
+await client.streamTaskLogs({
+  task_id: 'claude_1234567890',
+  sandbox_identifier: 'my-sandbox',
+  follow: false,
+  include_history: true,
+  from_timestamp: Date.now() - 3600000 // Last hour
+}, (logResponse) => {
+  console.log('Historical log:', logResponse.content);
 });
 
 // Get Claude status

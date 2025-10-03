@@ -19,7 +19,7 @@ export default function DashboardLayout() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex min-w-0">
+      <div className="flex-1 flex min-w-0 w-0">
         <MainContent />
       </div>
 

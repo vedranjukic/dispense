@@ -1,13 +1,20 @@
-import { RunClaudeTaskResponse, RunClaudeTaskResponseType } from '@api-client-ts';
+import {
+  RunClaudeTaskResponse,
+  RunClaudeTaskResponseType,
+  StreamTaskLogsResponse,
+  StreamTaskLogsResponseType
+} from '@api-client-ts';
 
-export { RunClaudeTaskResponse, RunClaudeTaskResponseType };
+export { RunClaudeTaskResponse, RunClaudeTaskResponseType, StreamTaskLogsResponse, StreamTaskLogsResponseType };
 
 export interface LogEntry {
-  type: RunClaudeTaskResponseType;
+  type: RunClaudeTaskResponseType | StreamTaskLogsResponseType;
   content: string;
   timestamp: number;
   exitCode?: number;
   isFinished?: boolean;
+  taskCompleted?: boolean;
+  taskStatus?: string;
 }
 
 export interface TaskLogsProps {

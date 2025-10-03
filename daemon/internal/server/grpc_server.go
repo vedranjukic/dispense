@@ -209,3 +209,22 @@ func (s *AgentServiceServer) ListTasks(ctx context.Context, req *proto.ListTasks
 		Tasks: tasks,
 	}, nil
 }
+
+// StreamTaskLogs streams logs for a specific task
+func (s *AgentServiceServer) StreamTaskLogs(req *proto.StreamTaskLogsRequest, stream proto.AgentService_StreamTaskLogsServer) error {
+	log.Printf("AgentService.StreamTaskLogs called for task: %s", req.TaskId)
+
+	// Validate task exists
+	status, err := s.taskManager.GetTaskStatus(req.TaskId)
+	if err != nil {
+		log.Printf("Failed to get task status: %v", err)
+		return stream.Send(&proto.StreamTaskLogsResponse{
+			Type:      proto.StreamTaskLogsResponse_ERROR,
+			Content:   fmt.Sprintf("Task not found: %v", err),
+			Timestamp: time.Now().Unix(),
+		})
+	}
+
+	// Stream the task logs
+	return s.taskManager.StreamTaskLogs(req, stream, status)
+}

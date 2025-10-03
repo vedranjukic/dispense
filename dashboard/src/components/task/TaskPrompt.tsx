@@ -3,7 +3,7 @@ import { TaskPromptProps } from '../../types/task';
 import { useTasks } from '../../hooks/useTasks';
 
 export default function TaskPrompt({ sandboxId, onTaskStart, isTaskRunning }: TaskPromptProps) {
-  const { runTask, taskHistory } = useTasks(sandboxId);
+  const { runTask, runStreamingTask, taskHistory } = useTasks(sandboxId);
   const [description, setDescription] = useState('');
   const [showHistory, setShowHistory] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -25,7 +25,8 @@ export default function TaskPrompt({ sandboxId, onTaskStart, isTaskRunning }: Ta
 
     try {
       onTaskStart(description);
-      await runTask(description);
+      // Use the new streaming method instead of the legacy runTask
+      await runStreamingTask(description);
       setDescription('');
     } catch (error) {
       console.error('Failed to start task:', error);
