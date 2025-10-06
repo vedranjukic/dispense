@@ -1,7 +1,7 @@
 export const API_BASE_URL = window.location.origin;
 
 export const POLLING_INTERVALS = {
-  SANDBOX_STATUS: 5000, // 5 seconds
+  SANDBOX_STATUS: 60000, // 60 seconds
   FILE_CHANGES: 10000,  // 10 seconds
   HEALTH_CHECK: 30000   // 30 seconds
 } as const;

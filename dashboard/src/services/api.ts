@@ -176,9 +176,7 @@ export class DashboardAPIService {
   }
 
   async listClaudeTasks(sandboxId: string) {
-    // For now, use the existing getClaudeLogs without taskId to get recent tasks
-    // This will be replaced with proper ListClaudeTasks endpoint when available
-    const response = await this.client.getClaudeLogs(sandboxId);
+    const response = await this.client.listClaudeTasks(sandboxId);
 
     if (response.error) {
       throw new Error(`${response.error.code}: ${response.error.message}`);

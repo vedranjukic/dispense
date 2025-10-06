@@ -2,10 +2,11 @@ import {
   RunClaudeTaskResponse,
   RunClaudeTaskResponseType,
   StreamTaskLogsResponse,
-  StreamTaskLogsResponseType
+  StreamTaskLogsResponseType,
+  TaskInfo
 } from '@api-client-ts';
 
-export { RunClaudeTaskResponse, RunClaudeTaskResponseType, StreamTaskLogsResponse, StreamTaskLogsResponseType };
+export { RunClaudeTaskResponse, RunClaudeTaskResponseType, StreamTaskLogsResponse, StreamTaskLogsResponseType, TaskInfo };
 
 export interface LogEntry {
   type: RunClaudeTaskResponseType | StreamTaskLogsResponseType;
@@ -19,7 +20,6 @@ export interface LogEntry {
 
 export interface TaskLogsProps {
   sandboxId: string;
-  taskId?: string;
   onTaskComplete: (exitCode: number) => void;
 }
 
@@ -27,6 +27,9 @@ export interface TaskPromptProps {
   sandboxId: string;
   onTaskStart: (taskDescription: string) => void;
   isTaskRunning: boolean;
+  // Task functions passed from parent (to avoid duplicate useTasks calls)
+  runStreamingTask: (taskDescription: string) => Promise<void>;
+  taskHistory: TaskHistory[];
 }
 
 export interface TaskHistory {
@@ -41,4 +44,5 @@ export interface TaskState {
   currentTask?: string;
   logs: LogEntry[];
   history: TaskHistory[];
+  tasks: TaskInfo[];
 }

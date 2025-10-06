@@ -419,10 +419,7 @@ func (s *ClaudeService) getTaskLogContent(sandboxInfo *models.SandboxInfo, logDi
 	}
 
 	// Split content into lines and add header
-	lines := []string{
-		fmt.Sprintf("📄 Log file: %s", logFile),
-		"─────────────────────────────────────",
-	}
+	lines := []string{}
 
 	content := string(output)
 	if content != "" {
@@ -431,7 +428,6 @@ func (s *ClaudeService) getTaskLogContent(sandboxInfo *models.SandboxInfo, logDi
 		lines = append(lines, "(log file is empty)")
 	}
 
-	lines = append(lines, "─────────────────────────────────────")
 	return lines, nil
 }
 

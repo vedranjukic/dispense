@@ -200,22 +200,20 @@ function formatStreamEvent(msg: ClaudeMessage): string {
  * Formats system messages
  */
 function formatSystemMessage(msg: ClaudeMessage): string {
-  if (!msg.message) {
-    return '⚙️ System message received';
-  }
+  const parts: string[] = ['⚙️ **System Initialized**'];
+
+  // Handle both nested message format and direct properties format
+  const sysData = (msg as any).message || msg;
 
   try {
-    const sysMsg = msg.message as SystemMessage;
-    const parts: string[] = ['⚙️ **System Initialized**'];
-
-    if (sysMsg.current_working_dir) {
-      parts.push(`Working Directory: ${sysMsg.current_working_dir}`);
+    if (sysData.cwd || sysData.current_working_dir) {
+      parts.push(`Working Directory: ${sysData.cwd || sysData.current_working_dir}`);
     }
-    if (sysMsg.model) {
-      parts.push(`Model: ${sysMsg.model}`);
+    if (sysData.model) {
+      parts.push(`Model: ${sysData.model}`);
     }
-    if (sysMsg.tools && sysMsg.tools.length > 0) {
-      parts.push(`Tools: ${sysMsg.tools.join(', ')}`);
+    if (sysData.tools && Array.isArray(sysData.tools) && sysData.tools.length > 0) {
+      parts.push(`Tools: ${sysData.tools.slice(0, 5).join(', ')}${sysData.tools.length > 5 ? '...' : ''}`);
     }
 
     return parts.join(' - ');
@@ -228,27 +226,31 @@ function formatSystemMessage(msg: ClaudeMessage): string {
  * Formats result messages
  */
 function formatResultMessage(msg: ClaudeMessage): string {
-  if (!msg.message) {
-    return '📊 Task completed';
-  }
+  const parts: string[] = ['📊 **Task Summary**'];
+
+  // Handle both nested message format and direct properties format
+  const resultData = (msg as any).message || msg;
 
   try {
-    const resultMsg = msg.message as ResultMessage;
-    const parts: string[] = ['📊 **Task Summary**'];
-
-    const duration = formatDuration(resultMsg.duration_ms);
-    parts.push(`Duration: ${duration}`);
-
-    if (resultMsg.input_tokens > 0 || resultMsg.output_tokens > 0) {
-      parts.push(`Tokens: ${resultMsg.input_tokens} input, ${resultMsg.output_tokens} output`);
+    if (resultData.duration_ms) {
+      const duration = formatDuration(resultData.duration_ms);
+      parts.push(`Duration: ${duration}`);
     }
 
-    if (resultMsg.total_cost > 0) {
-      parts.push(`Cost: $${resultMsg.total_cost.toFixed(4)}`);
+    // Handle usage data (could be in usage object or direct properties)
+    const usage = resultData.usage || resultData;
+    if (usage.input_tokens > 0 || usage.output_tokens > 0) {
+      parts.push(`Tokens: ${usage.input_tokens || 0} input, ${usage.output_tokens || 0} output`);
     }
 
-    if (resultMsg.permission_denial) {
-      parts.push(`Permission Denied: ${resultMsg.permission_denial}`);
+    // Handle cost (could be total_cost_usd or total_cost)
+    const cost = resultData.total_cost_usd || resultData.total_cost;
+    if (cost > 0) {
+      parts.push(`Cost: $${cost.toFixed(4)}`);
+    }
+
+    if (resultData.permission_denials && Array.isArray(resultData.permission_denials) && resultData.permission_denials.length > 0) {
+      parts.push(`Permission Denied: ${resultData.permission_denials.join(', ')}`);
     }
 
     return parts.join(' - ');

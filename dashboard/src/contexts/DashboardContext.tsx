@@ -9,7 +9,8 @@ const initialState: DashboardState = {
   tasks: {
     isRunning: false,
     logs: [],
-    history: []
+    history: [],
+    tasks: []
   },
   modifiedFiles: [],
   terminalOutput: [],

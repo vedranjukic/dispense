@@ -705,3 +705,53 @@ func (s *DispenseServer) CreateClaudeTask(ctx context.Context, req *pb.CreateCla
 		Message: daemonResp.Message,
 	}, nil
 }
+
+// ListClaudeTasks lists all tasks for a given sandbox
+func (s *DispenseServer) ListClaudeTasks(ctx context.Context, req *pb.ListClaudeTasksRequest) (*pb.ListClaudeTasksResponse, error) {
+	s.Logger.Printf("ListClaudeTasks called for: %s", req.SandboxIdentifier)
+
+	// Convert to internal model
+	listReq := &models.ClaudeTaskListRequest{
+		SandboxIdentifier: req.SandboxIdentifier,
+	}
+
+	// Call service
+	listResp, err := s.ServiceContainer.ClaudeService.ListTasks(listReq)
+	if err != nil {
+		s.Logger.Printf("Failed to list Claude tasks: %v", err)
+		return &pb.ListClaudeTasksResponse{
+			Error: s.convertError(err),
+		}, nil
+	}
+
+	if !listResp.Success {
+		return &pb.ListClaudeTasksResponse{
+			Success: false,
+			Error: &pb.ErrorResponse{
+				Code:    "TASK_LIST_FAILED",
+				Message: listResp.ErrorMsg,
+				Details: make(map[string]string),
+			},
+		}, nil
+	}
+
+	// Convert tasks to protobuf format
+	pbTasks := make([]*pb.TaskInfo, len(listResp.Tasks))
+	for i, task := range listResp.Tasks {
+		pbTasks[i] = &pb.TaskInfo{
+			TaskId:           task.TaskID,
+			Prompt:           task.Prompt,
+			State:            task.State,
+			StartedAt:        task.StartedAt,
+			FinishedAt:       task.FinishedAt,
+			ExitCode:         task.ExitCode,
+			Error:            task.Error,
+			WorkingDirectory: task.WorkDir,
+		}
+	}
+
+	return &pb.ListClaudeTasksResponse{
+		Success: true,
+		Tasks:   pbTasks,
+	}, nil
+}

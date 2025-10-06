@@ -1,10 +1,14 @@
 import React from 'react';
 import { useDashboard } from '../../contexts/DashboardContext';
+import { useTasks } from '../../hooks/useTasks';
 import TaskLogs from '../task/TaskLogs';
 import TaskPrompt from '../task/TaskPrompt';
 
 export default function MainContent() {
   const { state } = useDashboard();
+
+  // Use tasks hook once for the selected sandbox
+  const tasksData = useTasks(state.selectedSandbox?.id);
 
   if (!state.selectedSandbox) {
     return (
@@ -67,13 +71,16 @@ export default function MainContent() {
       </div>
 
       {/* Task Prompt */}
-      <div className="border-t border-gray-200">
+      <div id="task-prompt" className="border-t border-gray-200">
         <TaskPrompt
           sandboxId={state.selectedSandbox.id}
           onTaskStart={(description) => {
             console.log('Starting task:', description);
           }}
-          isTaskRunning={state.tasks.isRunning}
+          isTaskRunning={tasksData.isRunning}
+          // Pass task functions from shared hook
+          runStreamingTask={tasksData.runStreamingTask}
+          taskHistory={tasksData.taskHistory}
         />
       </div>
     </div>

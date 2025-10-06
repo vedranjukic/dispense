@@ -1,9 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { TaskPromptProps } from '../../types/task';
-import { useTasks } from '../../hooks/useTasks';
 
-export default function TaskPrompt({ sandboxId, onTaskStart, isTaskRunning }: TaskPromptProps) {
-  const { runTask, runStreamingTask, taskHistory } = useTasks(sandboxId);
+export default function TaskPrompt({
+  sandboxId,
+  onTaskStart,
+  isTaskRunning,
+  runStreamingTask,
+  taskHistory
+}: TaskPromptProps) {
   const [description, setDescription] = useState('');
   const [showHistory, setShowHistory] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);

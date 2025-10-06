@@ -19,6 +19,7 @@ type ClaudeServiceInterface interface {
 	RunTask(req *models.ClaudeTaskRequest) (*models.ClaudeTaskResponse, error)
 	GetStatus(req *models.ClaudeStatusRequest) (*models.ClaudeStatusResponse, error)
 	GetLogs(req *models.ClaudeLogsRequest) (*models.ClaudeLogsResponse, error)
+	ListTasks(req *models.ClaudeTaskListRequest) (*models.ClaudeTaskListResponse, error)
 }
 
 // ConfigManagerInterface defines the contract for configuration management

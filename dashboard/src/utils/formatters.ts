@@ -130,3 +130,56 @@ export function parseLogContent(content: string, taskPrompt?: string): { text: s
     return { text: content };
   }
 }
+
+export function formatLogEntry(content: string, logType: string, timestamp: number, taskDescription?: string): { formattedText: string; isFormatted: boolean } {
+  const timeStr = new Date(timestamp).toTimeString().substring(0, 8); // HH:MM:SS format
+
+  // Handle different log types
+  switch (logType) {
+    case 'STDOUT':
+      // Check if it's Claude JSON output
+      if (isClaudeJsonOutput(content)) {
+        const formattedContent = formatClaudeOutput(content, taskDescription);
+        if (formattedContent) {
+          return {
+            formattedText: `[${timeStr}] ${formattedContent}`,
+            isFormatted: true
+          };
+        }
+      }
+      // Plain stdout content - only show if it's not empty or meaningless
+      if (content.trim() && !content.includes('thinking')) {
+        return {
+          formattedText: `[${timeStr}] 💬 ${content}`,
+          isFormatted: true
+        };
+      }
+      break;
+
+    case 'STDERR':
+      return {
+        formattedText: `[${timeStr}] ⚠️ ${content}`,
+        isFormatted: true
+      };
+
+    case 'ERROR':
+      return {
+        formattedText: `[${timeStr}] ❌ ${content}`,
+        isFormatted: true
+      };
+
+    case 'STATUS':
+      return {
+        formattedText: `[${timeStr}] ℹ️ ${content}`,
+        isFormatted: true
+      };
+
+    default:
+      return {
+        formattedText: `[${timeStr}] ${content}`,
+        isFormatted: false
+      };
+  }
+
+  return { formattedText: '', isFormatted: false };
+}

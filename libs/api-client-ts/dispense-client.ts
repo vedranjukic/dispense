@@ -185,6 +185,27 @@ export interface GetClaudeLogsResponse {
   error?: ErrorResponse;
 }
 
+export interface TaskInfo {
+  taskId: string;
+  prompt: string;
+  state: string; // PENDING, RUNNING, COMPLETED, FAILED
+  startedAt: string;
+  finishedAt: string;
+  exitCode: number;
+  error: string;
+  workingDirectory: string;
+}
+
+export interface ListClaudeTasksRequest {
+  sandbox_identifier: string;
+}
+
+export interface ListClaudeTasksResponse {
+  success: boolean;
+  tasks: TaskInfo[];
+  error?: ErrorResponse;
+}
+
 // Streaming task logs types
 export enum StreamTaskLogsResponseType {
   STDOUT = 0,
@@ -439,6 +460,13 @@ export class DispenseClient {
     );
   }
 
+  async listClaudeTasks(sandbox_identifier: string): Promise<ListClaudeTasksResponse> {
+    return this.request<ListClaudeTasksResponse>(
+      'GET',
+      `/v1/claude/${encodeURIComponent(sandbox_identifier)}/tasks`
+    );
+  }
+
   // Stream task logs with real-time updates
   async streamTaskLogs(
     request: StreamTaskLogsRequest,
@@ -617,6 +645,15 @@ await client.streamTaskLogs({
 // Get Claude status
 const status = await client.getClaudeStatus('my-sandbox');
 console.log('Claude connected:', status.connected);
+
+// List Claude tasks for a sandbox
+const tasksResponse = await client.listClaudeTasks('my-sandbox');
+if (tasksResponse.success) {
+  console.log('Tasks:', tasksResponse.tasks);
+  tasksResponse.tasks.forEach(task => {
+    console.log(`Task ${task.task_id}: ${task.state} - ${task.prompt}`);
+  });
+}
 
 // Clean up
 await client.deleteSandbox('my-sandbox');
