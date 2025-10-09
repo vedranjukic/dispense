@@ -17,13 +17,20 @@ function TaskDisplay({ task, isExpanded, onToggleExpanded, sandboxId }: TaskDisp
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [showDetailedLogs, setShowDetailedLogs] = useState(false);
   const [logError, setLogError] = useState<string | null>(null);
+  // Guard to avoid duplicate initial fetch from StrictMode
+  const hasFetchedLogsRef = useRef<Record<string, boolean>>({});
 
   // Auto-fetch logs when component mounts (only for completed tasks)
   useEffect(() => {
-    if (taskLogs.length === 0 && !isLoadingLogs && task.state === 'COMPLETED') {
+    if (task.state !== 'COMPLETED') return;
+    if (isLoadingLogs) return;
+
+    // Only auto-fetch once per task id
+    if (!hasFetchedLogsRef.current[task.taskId]) {
+      hasFetchedLogsRef.current[task.taskId] = true;
       fetchTaskLogs();
     }
-  }, [task.taskId, task.state]);
+  }, [task.taskId, task.state, isLoadingLogs]);
 
   // Fetch logs for this specific task
   const fetchTaskLogs = async () => {
@@ -37,78 +44,24 @@ function TaskDisplay({ task, isExpanded, onToggleExpanded, sandboxId }: TaskDisp
       const logsResponse = await apiService.getClaudeLogs(sandboxId, task.taskId);
       
       if (logsResponse.success && logsResponse.logs) {
-        // Parse logs and extract meaningful content
+        // Backend already returns only model response values as plain lines
         const logEntries: LogEntry[] = [];
-        
-        // Process each log entry (each log is a single string with multiple lines)
-        let globalFoundAnswer = false;
-        
-        // Only process the first log entry that contains meaningful content
-        for (const log of logsResponse.logs) {
-          // Skip file references and separators
-          if (log.includes('📄 Log file:') || log.includes('─────────────────────────────────────')) {
-            continue;
-          }
-          
-          // Split the log into individual lines
-          const lines = log.split('\n');
-          
+        const now = Date.now();
+        for (const raw of logsResponse.logs) {
+          const lines = raw.split('\n');
           for (const line of lines) {
-            if (!line.trim() || globalFoundAnswer) break;
-            
-            try {
-              // Try to parse JSON content from STDOUT logs
-              const jsonMatch = line.match(/\[([^\]]+)\] \[STDOUT\] (.+)/);
-              if (jsonMatch) {
-                const timestamp = jsonMatch[1];
-                const jsonContent = jsonMatch[2];
-                
-                try {
-                  const parsed = JSON.parse(jsonContent);
-                  
-                  // Extract meaningful content based on JSON structure
-                  let content = '';
-                  
-                  // Priority 1: Look for result content (final answer) - most reliable
-                  if (parsed.type === 'result' && parsed.result) {
-                    content = parsed.result;
-                    globalFoundAnswer = true; // Stop after finding the result
-                  }
-                  // Priority 2: Look for assistant message with text content - complete response
-                  else if (parsed.type === 'assistant' && parsed.message && parsed.message.content) {
-                    const textContent = parsed.message.content
-                      .filter((c: any) => c.type === 'text')
-                      .map((c: any) => c.text)
-                      .join('');
-                    if (textContent.trim()) {
-                      content = textContent.trim();
-                      globalFoundAnswer = true; // Stop after finding the assistant message
-                    }
-                  }
-                  // Skip stream events - they're just deltas, not the final answer
-                  
-                  if (content) {
-                    logEntries.push({
-                      type: StreamTaskLogsResponseType.STDOUT,
-                      content: content,
-                      timestamp: new Date(timestamp).getTime(),
-                      isFinished: false,
-                      taskCompleted: false
-                    });
-                  }
-                } catch (jsonError) {
-                  // Skip JSON parsing errors
-                }
-              }
-            } catch (error) {
-              // Skip problematic log entries
-            }
+            const text = line.trim();
+            if (!text) continue;
+            logEntries.push({
+              type: StreamTaskLogsResponseType.STDOUT,
+              content: text,
+              timestamp: now,
+              isFinished: false,
+              taskCompleted: false
+            });
           }
-          
-          // If we found an answer, stop processing other log entries
-          if (globalFoundAnswer) break;
         }
-        
+
         setTaskLogs(logEntries);
       }
       
@@ -366,11 +319,11 @@ export default function TaskLogs({ sandboxId, onTaskComplete }: TaskLogsProps) {
     return task.state === filter;
   });
 
-  // Sort tasks by start time (most recent first)
+  // Sort tasks by creation/start time (ascending)
   const sortedTasks = [...filteredTasks].sort((a, b) => {
     const timeA = parseInt(a.startedAt) || 0;
     const timeB = parseInt(b.startedAt) || 0;
-    return timeB - timeA;
+    return timeA - timeB;
   });
 
   const toggleTaskExpansion = (taskId: string) => {

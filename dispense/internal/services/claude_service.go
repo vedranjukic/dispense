@@ -2,8 +2,10 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -418,17 +420,109 @@ func (s *ClaudeService) getTaskLogContent(sandboxInfo *models.SandboxInfo, logDi
 		return nil, fmt.Errorf("failed to read log file: %w", err)
 	}
 
-	// Split content into lines and add header
-	lines := []string{}
-
+	// Parse log lines and extract only model response values
 	content := string(output)
-	if content != "" {
-		lines = append(lines, content)
-	} else {
-		lines = append(lines, "(log file is empty)")
+	if strings.TrimSpace(content) == "" {
+		return []string{"(log file is empty)"}, nil
 	}
 
-	return lines, nil
+	// Common line formats:
+	// [2025-10-01T12:34:56Z] [STDOUT] { ...json... }
+	// [2025-10-01T12:34:56Z] [STDERR] { ...json... }
+	// { ...json... }
+	stdoutOrStderrRegex := regexp.MustCompile(`^\\[[^\\]]+\\] \\[(?:STDOUT|STDERR)\\] (.+)$`)
+
+	// Minimal JSON structures we care about
+	type assistantTextContent struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	type assistantMessage struct {
+		Content []assistantTextContent `json:"content"`
+	}
+	type logPayload struct {
+		Type    string           `json:"type"`
+		Result  string           `json:"result"`
+		Response string          `json:"response"`
+		Output  string           `json:"output"`
+		Answer  string           `json:"answer"`
+		FinalText string         `json:"final_text"`
+		Message *assistantMessage `json:"message"`
+	}
+
+	lines := strings.Split(content, "\n")
+	var lastAssistantText string
+	var lastResultText string
+
+	for _, rawLine := range lines {
+		rawLine = strings.TrimSpace(rawLine)
+		if rawLine == "" {
+			continue
+		}
+
+		var jsonStr string
+		if m := stdoutOrStderrRegex.FindStringSubmatch(rawLine); len(m) >= 2 {
+			jsonStr = m[1]
+		} else {
+			// If the line doesn't match the prefixed pattern, try to take JSON from first '{'
+			if idx := strings.Index(rawLine, "{"); idx >= 0 {
+				jsonStr = rawLine[idx:]
+			} else {
+				continue
+			}
+		}
+		var payload logPayload
+		if err := json.Unmarshal([]byte(jsonStr), &payload); err != nil {
+			// If JSON parsing fails, skip the line
+			continue
+		}
+
+		// Track potential final outputs but don't append yet; we'll return a single final line
+		if payload.Type == "result" && strings.TrimSpace(payload.Result) != "" {
+			lastResultText = strings.TrimSpace(payload.Result)
+			continue
+		}
+		if strings.TrimSpace(payload.FinalText) != "" {
+			lastResultText = strings.TrimSpace(payload.FinalText)
+			continue
+		}
+		if strings.TrimSpace(payload.Response) != "" {
+			lastResultText = strings.TrimSpace(payload.Response)
+			continue
+		}
+		if strings.TrimSpace(payload.Output) != "" {
+			lastResultText = strings.TrimSpace(payload.Output)
+			continue
+		}
+		if strings.TrimSpace(payload.Answer) != "" {
+			lastResultText = strings.TrimSpace(payload.Answer)
+			continue
+		}
+
+		// Priority 2: assistant message text content
+		if payload.Type == "assistant" && payload.Message != nil && len(payload.Message.Content) > 0 {
+			var b strings.Builder
+			for _, c := range payload.Message.Content {
+				if c.Type == "text" && strings.TrimSpace(c.Text) != "" {
+					b.WriteString(c.Text)
+				}
+			}
+			text := strings.TrimSpace(b.String())
+			if text != "" {
+				lastAssistantText = text
+			}
+		}
+	}
+
+	// Prefer the last assistant message text; fallback to last result-like text
+	if strings.TrimSpace(lastAssistantText) != "" {
+		return []string{strings.TrimSpace(lastAssistantText)}, nil
+	}
+	if strings.TrimSpace(lastResultText) != "" {
+		return []string{strings.TrimSpace(lastResultText)}, nil
+	}
+
+	return []string{}, nil
 }
 
 // getRecentLogs retrieves list of recent log files and their info

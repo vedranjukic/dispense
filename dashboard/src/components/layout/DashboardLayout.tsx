@@ -8,7 +8,7 @@ export default function DashboardLayout() {
   const { state } = useDashboard();
 
   return (
-    <div className="flex h-full bg-gray-50">
+    <div className="flex h-full w-full flex-1 min-h-0 bg-gray-50">
       {/* Left Sidebar */}
       <div
         className={`${
@@ -19,7 +19,7 @@ export default function DashboardLayout() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex min-w-0 w-0">
+      <div className="flex-1 flex min-w-0 w-0 h-full min-h-0">
         <MainContent />
       </div>
 

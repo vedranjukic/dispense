@@ -283,6 +283,8 @@ h6 { font-size: 0.875rem; }
 
 .h-full { height: 100%; }
 .h-screen { height: 100vh; }
+.min-h-screen { min-height: 100vh; }
+.max-h-screen { max-height: 100vh; }
 .h-1 { height: 0.25rem; }
 .h-2 { height: 0.5rem; }
 .h-3 { height: 0.75rem; }

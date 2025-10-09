@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { RunClaudeTaskResponse, StreamTaskLogsResponse, StreamTaskLogsResponseType } from '@api-client-ts';
 import { apiService } from '../services/api';
 import { useDashboard } from '../contexts/DashboardContext';
@@ -9,10 +9,18 @@ export function useTasks(sandboxId?: string) {
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  // Guard against React 18 StrictMode double-effect invocation
+  const hasLoadedForSandboxRef = useRef<Record<string, boolean>>({});
 
   // Load existing logs when sandbox changes
   const loadExistingLogs = useCallback(async () => {
     if (!sandboxId) return;
+
+    // Prevent duplicate fetches when effects run twice in StrictMode
+    if (hasLoadedForSandboxRef.current[sandboxId]) {
+      return;
+    }
+    hasLoadedForSandboxRef.current[sandboxId] = true;
 
     try {
       setIsLoading(true);

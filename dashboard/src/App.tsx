@@ -122,39 +122,11 @@ function App() {
     <ErrorBoundary>
       <DashboardProvider>
         <div className="h-screen overflow-hidden bg-gray-50">
-          {/* Header */}
-          <header className="bg-white border-b border-gray-200 px-6 py-3 flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="flex items-center space-x-3">
-                  {/* Logo */}
-                  <div className="flex-shrink-0">
-                    <svg className="h-8 w-8 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 4a1 1 0 011-1h12a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1V8z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-
-                  {/* Title */}
-                  <div>
-                    <h1 className="text-lg font-semibold text-gray-900">Dispense Dashboard</h1>
-                    <p className="text-xs text-gray-500">Sandbox Management Interface</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center space-x-4">
-                {/* Future: Add global actions like settings, help, etc. */}
-                <div className="text-xs text-gray-500">
-                  v1.0.0
-                </div>
-              </div>
-            </div>
-          </header>
-
           {/* Main Content */}
-          <main className="flex-1 overflow-hidden">
-            <DashboardLayout />
+          <main className="flex-1 overflow-hidden h-full min-h-0">
+            <div className="h-full w-full flex flex-col min-h-0">
+              <DashboardLayout />
+            </div>
           </main>
 
           {/* Health Check Component */}
